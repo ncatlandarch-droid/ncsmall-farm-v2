@@ -57,13 +57,17 @@
 
       // ── Top: Search ──
       h('div', { style: { position: 'absolute', top: '12px', left: '50%', transform: 'translateX(-50%)', zIndex: '1000', display: 'flex', gap: '8px', alignItems: 'center' } },
-        h('div', { style: { display: 'flex', alignItems: 'center', background: 'rgba(10,14,23,0.85)', backdropFilter: 'blur(12px)', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.1)', overflow: 'hidden', width: '360px', boxShadow: '0 4px 20px rgba(0,0,0,0.4)' } },
-          h('span', { className: 'material-icons-round', style: { padding: '10px 12px', color: '#94a3b8', fontSize: '18px' } }, 'search'),
+        h('div', { style: { display: 'flex', alignItems: 'center', background: 'rgba(10,14,23,0.85)', backdropFilter: 'blur(12px)', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.1)', overflow: 'hidden', width: '400px', boxShadow: '0 4px 20px rgba(0,0,0,0.4)' } },
+          h('span', { className: 'material-icons-round', style: { padding: '10px 12px', color: '#94a3b8', fontSize: '18px', cursor: 'pointer' },
+            onclick: () => { if (filterText.trim()) geocodeAddress(filterText); }
+          }, 'search'),
           h('input', {
-            type: 'text', placeholder: 'Search address or owner (Coming soon)...',
+            id: 'nc-search-input',
+            type: 'text', placeholder: 'Enter address, city, or PIN...',
             style: { flex: '1', border: 'none', outline: 'none', background: 'transparent', color: '#f8fafc', fontSize: '13px', fontWeight: '500', padding: '10px 12px 10px 0', fontFamily: 'Inter, sans-serif' },
             value: filterText,
-            onInput: (e) => { filterText = e.target.value; }
+            onInput: (e) => { filterText = e.target.value; },
+            onKeyDown: (e) => { if (e.key === 'Enter' && filterText.trim()) geocodeAddress(filterText); }
           })
         )
       ),
@@ -279,6 +283,57 @@
         fetchRealParcels(); 
       }
     }, 400);
+  }
+
+  /* ── Address Geocoding (ArcGIS World Geocoder — free) ──── */
+  let searchMarker = null;
+
+  function geocodeAddress(query) {
+    if (!mapInstance) return;
+    showToast('Searching: ' + query + '...', 'info');
+
+    // Bias search to Guilford County, NC area
+    var searchUrl = 'https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates'
+      + '?f=json'
+      + '&singleLine=' + encodeURIComponent(query)
+      + '&location=-79.79,36.07'  // Guilford County center
+      + '&distance=50000'          // 50km search radius
+      + '&maxLocations=1'
+      + '&outFields=Addr_type,Match_addr,StAddr,City,Region';
+
+    fetch(searchUrl)
+      .then(function(res) { return res.json(); })
+      .then(function(data) {
+        if (!data.candidates || !data.candidates.length) {
+          showToast('No results found for "' + query + '"', 'error');
+          return;
+        }
+
+        var result = data.candidates[0];
+        var lat = result.location.y;
+        var lon = result.location.x;
+        var matchAddr = result.attributes?.Match_addr || result.address || query;
+
+        // Drop a search pin
+        if (searchMarker) { mapInstance.removeLayer(searchMarker); }
+        searchMarker = L.marker([lat, lon], {
+          icon: L.divIcon({
+            className: 'search-pin',
+            html: '<div style="background:#e53e3e;color:white;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.4);font-size:16px;"><span class="material-icons-round" style="font-size:18px;">location_on</span></div>',
+            iconSize: [32, 32],
+            iconAnchor: [16, 32]
+          })
+        }).addTo(mapInstance);
+        searchMarker.bindPopup('<div style="font-family:Inter,sans-serif;font-size:12px;font-weight:600;">' + matchAddr + '</div>').openPopup();
+
+        // Fly to the location at parcel-visible zoom
+        mapInstance.flyTo([lat, lon], 16, { duration: 1.5 });
+        showToast('Found: ' + matchAddr, 'success');
+      })
+      .catch(function(err) {
+        console.error('[Geocode]', err);
+        showToast('Search failed — try a different address', 'error');
+      });
   }
 
   /* ── Fetch REAL parcel polygons from gis-proxy ── */
