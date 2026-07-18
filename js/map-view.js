@@ -469,12 +469,20 @@
       },
       onEachFeature: function(feature, layer) {
         var p = feature.properties || {};
-        var owner = p.owner || p.ownname || p.OWNER_NAME || p.OWNER || p.OWNERNM || 'Unknown';
-        var addr = p.mailadd || p.siteadd || p.SITUS_ADDRESS || p.SITE_ADDR || p.sadd || 'Unknown Address';
-        var acres = p.GISACRES || p.gisacres || p.acres || p.CALCACRES || '0';
-        var landUse = p.usedesc || p.parusedesc || p.LAND_USE || p.parusecode || 'Unknown';
-        var useCode = p.usecode || p.parusecode || p.LAND_USE_CODE || p.LUSECODE || '';
-        var pin = p.parcelnumb || p.parno || p.PARCEL_ID || p.PIN || p.PARID || '';
+        
+        // Debug: log first parcel's raw field names so we can see what comes back
+        if (classCounts['confirmed-farm'] + classCounts['likely-farm'] + classCounts['potential-farm'] + classCounts['non-agricultural'] === 0) {
+          console.log('[NCSmall] FIRST PARCEL RAW PROPERTIES:', JSON.stringify(p, null, 2));
+          console.log('[NCSmall] ALL FIELD NAMES:', Object.keys(p));
+        }
+
+        // Broad field name search — NC GIS uses many variations
+        var owner = p.owner || p.ownname || p.OWNER_NAME || p.OWNER || p.OWNERNM || p.ownname1 || p.OWNER1 || p.owname || p.OWN_NAME || 'Unknown';
+        var addr = p.mailadd || p.siteadd || p.SITUS_ADDRESS || p.SITE_ADDR || p.sadd || p.addr1 || p.phyaddr || p.address || p.ADDRESS || p.ADDR || p.phyadd || p.sitead || p.location || p.LOCATION || p.PHYADDR1 || p.staddr || p.STADDR || 'No Address Available';
+        var acres = p.GISACRES || p.gisacres || p.acres || p.CALCACRES || p.ACREAGE || p.Acres || p.calcacres || p.totalacres || p.TOTALACRES || p.lotsize || '0';
+        var landUse = p.usedesc || p.parusedesc || p.LAND_USE || p.parusecode || p.landuse || p.LANDUSE || p.lu || p.LU || p.proptype || p.PROPTYPE || p.class || p.CLASS || 'Unknown';
+        var useCode = p.usecode || p.parusecode || p.LAND_USE_CODE || p.LUSECODE || p.luc || p.LUC || '';
+        var pin = p.parcelnumb || p.parno || p.PARCEL_ID || p.PIN || p.PARID || p.pin || p.pid || p.PID || p.parcel_id || '';
         var cls = classifyParcel(landUse, acres, useCode);
         var fc = FARM_CLASS[cls];
 
