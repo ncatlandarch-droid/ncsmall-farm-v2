@@ -688,21 +688,21 @@
         var safeOwner = owner.replace(/'/g, "\\'").replace(/"/g, '&quot;');
         var safeAddr = addr.replace(/'/g, "\\'").replace(/"/g, '&quot;');
 
-        var popupContent = '<div id="popup-' + pin + '" style="min-width:280px;font-family:Inter,sans-serif;padding:4px;">'
-          + '<div style="font-weight:900;color:#004684;font-size:15px;margin-bottom:2px;">' + owner + '</div>'
+        var popupContent = '<div id="popup-' + pin + '" style="min-width:280px;font-family:Inter,sans-serif;padding:12px;">'
+          + '<div style="font-weight:900;color:#f8fafc;font-size:15px;margin-bottom:2px;">' + owner + '</div>'
           + '<div style="font-size:11px;color:#94a3b8;margin-bottom:6px;">' + addr + '</div>'
           + '<div style="display:flex;gap:6px;align-items:center;margin-bottom:10px;">' + badge
           + (pin ? '<span style="font-size:10px;color:#64748b;">PIN: ' + pin + '</span>' : '') + '</div>'
           + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">'
-          + '<div><div style="font-size:9px;color:#94a3b8;text-transform:uppercase;">Acreage</div><div style="font-weight:800;font-size:14px;">' + parseFloat(acres).toFixed(2) + ' ac</div></div>'
+          + '<div><div style="font-size:9px;color:#94a3b8;text-transform:uppercase;">Acreage</div><div style="font-weight:800;font-size:14px;color:#f8fafc;">' + parseFloat(acres).toFixed(2) + ' ac</div></div>'
           + '<div><div style="font-size:9px;color:#94a3b8;text-transform:uppercase;">Land Use</div><div style="font-size:11px;font-weight:600;color:' + fc.color + ';">' + landUse + '</div></div>'
           + '</div>'
-          + '<div id="tax-data-' + pin + '" style="margin-bottom:12px; padding: 8px; background: rgba(0,70,132,0.05); border-radius: 6px;">'
-          + '<div style="font-size:11px;color:#64748b;display:flex;align-items:center;gap:4px;"><span class="material-icons-round" style="font-size:14px;">sync</span> Loading tax data...</div>'
+          + '<div id="tax-data-' + pin + '" style="margin-bottom:12px; padding: 8px; background: rgba(255,255,255,0.06); border-radius: 6px;">'
+          + '<div style="font-size:11px;color:#94a3b8;display:flex;align-items:center;gap:4px;"><span class="material-icons-round" style="font-size:14px;">sync</span> Loading tax data...</div>'
           + '</div>'
           + '<div style="display:flex;gap:6px;margin-bottom:12px;">'
-          + '<a href="https://gisdv.guilfordcountync.gov/Guilford/?pin=' + pin + '" target="_blank" style="flex:1;text-align:center;padding:6px;background:#e2e8f0;color:#334155;border-radius:4px;font-size:10px;font-weight:bold;text-decoration:none;">View on County GIS</a>'
-          + '<a href="https://lrcpwa.ncptscloud.com/guilford/" target="_blank" style="flex:1;text-align:center;padding:6px;background:#e2e8f0;color:#334155;border-radius:4px;font-size:10px;font-weight:bold;text-decoration:none;">View Tax Record</a>'
+          + '<a href="https://gisdv.guilfordcountync.gov/Guilford/?pin=' + pin + '" target="_blank" style="flex:1;text-align:center;padding:6px;background:rgba(255,255,255,0.1);color:#f8fafc;border-radius:4px;font-size:10px;font-weight:bold;text-decoration:none;border:1px solid rgba(255,255,255,0.15);">View on County GIS</a>'
+          + '<a href="https://lrcpwa.ncptscloud.com/guilford/" target="_blank" style="flex:1;text-align:center;padding:6px;background:rgba(255,255,255,0.1);color:#f8fafc;border-radius:4px;font-size:10px;font-weight:bold;text-decoration:none;border:1px solid rgba(255,255,255,0.15);">View Tax Record</a>'
           + '</div>'
           + '<button onclick="window.openIntakeForm(\'' + pin + '\', \'' + safeOwner + '\', \'' + safeAddr + '\', \'' + acres + '\')" style="width:100%;padding:10px;background:#3B7A57;color:white;border:none;border-radius:8px;font-weight:800;font-size:12px;cursor:pointer;font-family:Inter,sans-serif;box-shadow:0 4px 12px rgba(59,122,87,0.3);">🌱 This Is My Farm — Start Assessment</button>'
           + '</div>';
@@ -798,18 +798,18 @@
 
             const valFmt = v => v ? '$' + Number(v).toLocaleString() : 'N/A';
             let html = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">';
-            html += '<div><div style="font-size:9px;color:#94a3b8;text-transform:uppercase;">Assessed Value</div><div style="font-weight:800;font-size:13px;color:#004684;">' + valFmt(data.assessedValue) + '</div></div>';
+            html += '<div><div style="font-size:9px;color:#94a3b8;text-transform:uppercase;">Assessed Value</div><div style="font-weight:800;font-size:13px;color:#FDB927;">' + valFmt(data.assessedValue) + '</div></div>';
             
             if (data.deferredValue && Number(data.deferredValue) > 0) {
                html += '<div><div style="font-size:9px;color:#94a3b8;text-transform:uppercase;">Deferred (PVU)</div><div style="font-weight:800;font-size:13px;color:#2E7D32;">' + valFmt(data.deferredValue) + '</div><div style="font-size:9px;color:#4CAF50;font-weight:bold;">✓ PVU Enrolled</div></div>';
             } else {
-               html += '<div><div style="font-size:9px;color:#94a3b8;text-transform:uppercase;">Property Type</div><div style="font-weight:600;font-size:12px;">' + (data.propertyType || 'N/A') + '</div></div>';
+               html += '<div><div style="font-size:9px;color:#94a3b8;text-transform:uppercase;">Property Type</div><div style="font-weight:600;font-size:12px;color:#f8fafc;">' + (data.propertyType || 'N/A') + '</div></div>';
             }
             html += '</div>';
 
             html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">';
-            html += '<div><div style="font-size:9px;color:#94a3b8;text-transform:uppercase;">Year Built</div><div style="font-size:11px;font-weight:600;">' + (data.yearBuilt || 'N/A') + '</div></div>';
-            html += '<div><div style="font-size:9px;color:#94a3b8;text-transform:uppercase;">Structure Size</div><div style="font-size:11px;font-weight:600;">' + (data.structureSize ? Number(data.structureSize).toLocaleString() + ' sqft' : 'N/A') + '</div></div>';
+            html += '<div><div style="font-size:9px;color:#94a3b8;text-transform:uppercase;">Year Built</div><div style="font-size:11px;font-weight:600;color:#f8fafc;">' + (data.yearBuilt || 'N/A') + '</div></div>';
+            html += '<div><div style="font-size:9px;color:#94a3b8;text-transform:uppercase;">Structure Size</div><div style="font-size:11px;font-weight:600;color:#f8fafc;">' + (data.structureSize ? Number(data.structureSize).toLocaleString() + ' sqft' : 'N/A') + '</div></div>';
             html += '</div>';
 
             // Auto-generate EQIP Opportunity Card
