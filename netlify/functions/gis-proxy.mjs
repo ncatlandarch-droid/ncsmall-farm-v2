@@ -100,47 +100,48 @@ async function arcgisQuery(urls, params) {
  */
 function _normalizeNCOneMap(fc) {
   if (!fc?.features) return fc;
-  
-  // Log first feature's raw field names for debugging
-  if (fc.features.length > 0) {
-    console.log('[gis-proxy] NC OneMap field names:', Object.keys(fc.features[0].properties || {}));
-    console.log('[gis-proxy] NC OneMap first feature sample:', JSON.stringify(fc.features[0].properties, null, 2).substring(0, 800));
-  }
 
   fc.features.forEach(f => {
     const p = f.properties;
     if (!p) return;
     
-    // Map NC OneMap names → parcel card aliases used by _prop()
+    // Standard field mappings
     if (p.parno      != null) p.parcelnumb = p.parno;
     if (p.ownname    != null) p.owner      = p.ownname;
     if (p.ownname2   != null) p.OWNER1     = p.ownname2;
     if (p.gisacres   != null) p.GISACRES   = p.gisacres;
     if (p.parusedesc != null) p.usedesc    = p.parusedesc;
     if (p.parusecode != null) p.usecode    = p.parusecode;
+    if (p.cntyname   != null) p.county     = p.cntyname;
     
-    // Address: try siteadd first, then build from components
-    if (p.siteadd && String(p.siteadd).trim()) {
-      p.mailadd = p.siteadd;
-    } else if (p.addr1 && String(p.addr1).trim()) {
-      p.mailadd = p.addr1;
-    } else if (p.phyaddr && String(p.phyaddr).trim()) {
-      p.mailadd = p.phyaddr;
-    } else {
-      // Build from number + street + suffix + city
-      var parts = [];
-      if (p.stnum || p.housenum) parts.push(String(p.stnum || p.housenum).trim());
-      if (p.stname || p.streetname) parts.push(String(p.stname || p.streetname).trim());
-      if (p.stsuffix || p.sttype) parts.push(String(p.stsuffix || p.sttype).trim());
-      if (p.stdir) parts.push(String(p.stdir).trim());
-      if (parts.length > 0) {
-        p.mailadd = parts.join(' ');
-        if (p.city) p.mailadd += ', ' + p.city;
-      } else if (p.mailadd1) {
-        p.mailadd = p.mailadd1;
-      }
-      // If still nothing, leave mailadd unset — client will show fallback
+    // NC OneMap address reality:
+    //   siteadd = EMPTY for most Guilford Co parcels
+    //   saddno/saddstname/saddstr/saddstsuf/saddsttyp = site address COMPONENTS
+    //   mailadd = owner's MAILING address (could be PO Box or different city)
+    //   scity = site city, mcity = mailing city
+    
+    // Step 1: Try assembling from site address components
+    var parts = [];
+    if (p.saddno && String(p.saddno).trim()) parts.push(String(p.saddno).trim());
+    if (p.saddpref && String(p.saddpref).trim()) parts.push(String(p.saddpref).trim());
+    if (p.saddstname && String(p.saddstname).trim()) parts.push(String(p.saddstname).trim());
+    if (p.saddsttyp && String(p.saddsttyp).trim()) parts.push(String(p.saddsttyp).trim());
+    if (p.saddstsuf && String(p.saddstsuf).trim()) parts.push(String(p.saddstsuf).trim());
+    
+    if (parts.length >= 2) {
+      // We have a real site address from components
+      p.address = parts.join(' ');
+      if (p.scity && String(p.scity).trim()) p.address += ', ' + String(p.scity).trim();
+    } else if (p.siteadd && String(p.siteadd).trim()) {
+      // siteadd field has data (rare for Guilford)
+      p.address = String(p.siteadd).trim();
+      if (p.scity && String(p.scity).trim()) p.address += ', ' + String(p.scity).trim();
+    } else if (p.mailadd && String(p.mailadd).trim()) {
+      // Fall back to owner's mailing address
+      p.address = String(p.mailadd).trim();
+      if (p.mcity && String(p.mcity).trim()) p.address += ', ' + String(p.mcity).trim();
     }
+    // If nothing found, p.address stays undefined — client shows county/PIN
   });
   return fc;
 }

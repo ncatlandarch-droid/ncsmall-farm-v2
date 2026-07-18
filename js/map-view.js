@@ -69,9 +69,9 @@
       return 'potential-farm';
     }
 
-    // Potential: development-restricted or conservation land
-    if (lu.includes('DEVELOPMT') || lu.includes('RESTRICTED') || lu.includes('CONSERV') ||
-        lu.includes('EASEMENT') || lu.includes('PRESERVE') || lu.includes('WILDLIFE')) {
+    // Potential: conservation/wildlife land (genuinely farm-adjacent)
+    if ((lu.includes('CONSERV') || lu.includes('EASEMENT') || lu.includes('PRESERVE') || 
+        lu.includes('WILDLIFE')) && ac >= 3) {
       return 'potential-farm';
     }
 
@@ -545,19 +545,20 @@
         var pin = p.parcelnumb || p.parno || p.PARCEL_ID || p.PIN || p.PARID || p.pin || p.pid || p.PID || p.parcel_id || '';
         var county = p.cntyname || p.COUNTY || p.county || '';
         
-        // Address: try many field names, then build a useful fallback
-        var addr = p.mailadd || p.siteadd || p.SITUS_ADDRESS || p.SITE_ADDR || p.sadd || p.addr1 || p.phyaddr || p.address || p.ADDRESS || p.ADDR || p.phyadd || p.sitead || p.PHYADDR1 || p.staddr || p.STADDR || '';
+        // Address: check proxy-assembled 'address' FIRST, then try raw fields
+        var addr = p.address || p.siteadd || p.mailadd || '';
         if (!addr || !String(addr).trim() || addr === 'null') {
-          // Build from components if available
+          // Build from site address components (NC OneMap fields)
           var parts = [];
-          if (p.stnum) parts.push(String(p.stnum).trim());
-          if (p.stname) parts.push(String(p.stname).trim());
-          if (p.stsuffix) parts.push(String(p.stsuffix).trim());
-          if (parts.length > 0) {
+          if (p.saddno) parts.push(String(p.saddno).trim());
+          if (p.saddstname) parts.push(String(p.saddstname).trim());
+          if (p.saddsttyp) parts.push(String(p.saddsttyp).trim());
+          if (parts.length >= 2) {
             addr = parts.join(' ');
-            if (p.city) addr += ', ' + p.city;
+            if (p.scity) addr += ', ' + p.scity;
           } else {
-            addr = county ? county + ' County' : 'Guilford County';
+            var cty = p.county || p.cntyname || 'Guilford';
+            addr = cty + ' County';
             if (pin) addr += ' · PIN ' + pin;
           }
         }
