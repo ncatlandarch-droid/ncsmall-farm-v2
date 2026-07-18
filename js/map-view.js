@@ -13,6 +13,39 @@
   let isFetchingParcels = false;
   let totalRealParcelsInView = 0;
 
+  /* ── Farm Classification from land use ────────────────────── */
+  const FARM_CLASS = {
+    'confirmed-farm':   { color: '#2E7D32', fill: 'rgba(46,125,50,0.18)',  label: 'Confirmed Farm' },
+    'likely-farm':      { color: '#4CAF50', fill: 'rgba(76,175,80,0.15)',  label: 'Likely Farm' },
+    'potential-farm':   { color: '#FFC107', fill: 'rgba(255,193,7,0.15)',  label: 'Potential Farm' },
+    'non-agricultural': { color: '#78909C', fill: 'rgba(120,144,156,0.08)', label: 'Non-Agricultural' }
+  };
+
+  function classifyParcel(landUse, acres) {
+    var lu = (landUse || '').toUpperCase();
+    var ac = parseFloat(acres) || 0;
+    // Confirmed: explicitly agricultural land use
+    if (lu.includes('AGRI') || lu.includes('FARM') || lu.includes('CROP') ||
+        lu.includes('DAIRY') || lu.includes('LIVESTOCK') || lu.includes('ORCHARD') ||
+        lu.includes('TIMBER') || lu.includes('FOREST') || lu.includes('HORTI') ||
+        lu.includes('NURSERY') || lu.includes('POULTRY') || lu.includes('RANCH')) {
+      return 'confirmed-farm';
+    }
+    // Likely: rural residential with significant acreage
+    if ((lu.includes('RURAL') || lu.includes('R-A') || lu.includes('AG')) && ac >= 5) {
+      return 'likely-farm';
+    }
+    // Potential: residential with 10+ acres (could be farmed)
+    if (lu.includes('RESID') && ac >= 10) {
+      return 'potential-farm';
+    }
+    // Potential: vacant land with 5+ acres
+    if ((lu.includes('VACANT') || lu.includes('UNIMP') || lu === '' || lu === 'UNKNOWN') && ac >= 5) {
+      return 'potential-farm';
+    }
+    return 'non-agricultural';
+  }
+
   /* ── Main Render ─────────────────────────────────────────── */
   window.renderMapView = function() {
     setTimeout(() => initMap(), 80);
@@ -186,6 +219,7 @@
   }
   function farmFilterBtn(key, label, color, count) {
     return h('button', {
+      'data-farm-class': key,
       style: {
         display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%',
         padding: '6px 8px', marginBottom: '3px', borderRadius: '8px', border: 'none',
@@ -194,10 +228,10 @@
       }
     },
       h('div', { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
-        h('div', { style: { width: '8px', height: '8px', borderRadius: '50%', background: color, flexShrink: '0' } }),
+        h('div', { style: { width: '10px', height: '10px', borderRadius: '50%', background: color, flexShrink: '0', border: '2px solid ' + color + '88' } }),
         h('span', { style: { fontSize: '11px', fontWeight: '500', color: '#94a3b8' } }, label)
       ),
-      h('span', { style: { fontSize: '11px', fontWeight: '800', color: '#64748b' } }, String(count))
+      h('span', { className: 'fc-count', style: { fontSize: '11px', fontWeight: '800', color: color } }, String(count))
     );
   }
   function layerDot(label, icon, color, active) {
@@ -320,13 +354,25 @@
 
   function renderParcelGeoJSON(geojson) {
     if (realParcelLayer) { mapInstance.removeLayer(realParcelLayer); }
+
+    // Track classification counts
+    var classCounts = { 'confirmed-farm': 0, 'likely-farm': 0, 'potential-farm': 0, 'non-agricultural': 0 };
+    var farmAcres = 0;
+
     realParcelLayer = L.geoJSON(geojson, {
-      style: {
-        color: '#FDB927',
-        weight: 2,
-        fillColor: 'rgba(253,185,39,0.08)',
-        fillOpacity: 0.08,
-        opacity: 0.9
+      style: function(feature) {
+        var p = feature.properties || {};
+        var landUse = p.usedesc || p.parusedesc || p.LAND_USE || p.parusecode || '';
+        var acres = p.GISACRES || p.gisacres || p.acres || p.CALCACRES || '0';
+        var cls = classifyParcel(landUse, acres);
+        var fc = FARM_CLASS[cls];
+        return {
+          color: fc.color,
+          weight: cls === 'non-agricultural' ? 1 : 2.5,
+          fillColor: fc.fill,
+          fillOpacity: cls === 'non-agricultural' ? 0.04 : 0.15,
+          opacity: cls === 'non-agricultural' ? 0.5 : 0.9
+        };
       },
       onEachFeature: function(feature, layer) {
         var p = feature.properties || {};
@@ -335,19 +381,30 @@
         var acres = p.GISACRES || p.gisacres || p.acres || p.CALCACRES || '0';
         var landUse = p.usedesc || p.parusedesc || p.LAND_USE || p.parusecode || 'Unknown';
         var pin = p.parcelnumb || p.parno || p.PARCEL_ID || p.PIN || p.PARID || '';
+        var cls = classifyParcel(landUse, acres);
+        var fc = FARM_CLASS[cls];
+
+        // Track counts
+        classCounts[cls]++;
+        if (cls === 'confirmed-farm' || cls === 'likely-farm') farmAcres += parseFloat(acres) || 0;
+
+        // Classification badge
+        var badge = '<span style="padding:3px 8px;border-radius:4px;font-size:10px;font-weight:700;'
+          + 'background:' + fc.color + '22;color:' + fc.color + ';border:1px solid ' + fc.color + '44;">' + fc.label + '</span>';
         
-        // Escape quotes to safely pass strings in HTML onclick handlers
+        // Escape quotes for onclick
         var safeOwner = owner.replace(/'/g, "\\'").replace(/"/g, '&quot;');
         var safeAddr = addr.replace(/'/g, "\\'").replace(/"/g, '&quot;');
 
         var popupContent = '<div id="popup-' + pin + '" style="min-width:280px;font-family:Inter,sans-serif;padding:4px;">'
           + '<div style="font-weight:900;color:#004684;font-size:15px;margin-bottom:2px;">' + owner + '</div>'
           + '<div style="font-size:11px;color:#94a3b8;margin-bottom:6px;">' + addr + '</div>'
-          + (pin ? '<div style="font-size:10px;color:#64748b;margin-bottom:12px;">PIN: ' + pin + '</div>' : '')
+          + '<div style="display:flex;gap:6px;align-items:center;margin-bottom:10px;">' + badge
+          + (pin ? '<span style="font-size:10px;color:#64748b;">PIN: ' + pin + '</span>' : '') + '</div>'
           
           + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">'
           + '<div><div style="font-size:9px;color:#94a3b8;text-transform:uppercase;">Acreage</div><div style="font-weight:800;font-size:14px;">' + parseFloat(acres).toFixed(2) + ' ac</div></div>'
-          + '<div><div style="font-size:9px;color:#94a3b8;text-transform:uppercase;">Land Use</div><div style="font-size:11px;font-weight:600;">' + landUse + '</div></div>'
+          + '<div><div style="font-size:9px;color:#94a3b8;text-transform:uppercase;">Land Use</div><div style="font-size:11px;font-weight:600;color:' + fc.color + ';">' + landUse + '</div></div>'
           + '</div>'
           
           + '<div id="tax-data-' + pin + '" style="margin-bottom:12px; padding: 8px; background: rgba(0,70,132,0.05); border-radius: 6px;">'
@@ -365,19 +422,46 @@
         layer.bindPopup(popupContent, { maxWidth: 320 });
 
         layer.on('popupopen', function() {
-           if (pin) {
-               fetchEnrichedTaxData(pin, acres, landUse);
-           }
+           if (pin) fetchEnrichedTaxData(pin, acres, landUse);
         });
 
+        // Store classification color on the layer for mouseout restore
+        layer._ncClass = cls;
         layer.on('mouseover', function() {
-          this.setStyle({ weight: 4, fillOpacity: 0.25, color: '#FFD700' });
+          this.setStyle({ weight: 4, fillOpacity: 0.3, color: '#FFD700' });
         });
         layer.on('mouseout', function() {
-          this.setStyle({ weight: 2, fillOpacity: 0.08, color: '#FDB927' });
+          var c = FARM_CLASS[this._ncClass] || FARM_CLASS['non-agricultural'];
+          this.setStyle({ 
+            weight: this._ncClass === 'non-agricultural' ? 1 : 2.5, 
+            fillOpacity: this._ncClass === 'non-agricultural' ? 0.04 : 0.15, 
+            color: c.color 
+          });
         });
       }
     }).addTo(mapInstance);
+
+    // Update legend counts
+    updateClassCounts(classCounts, farmAcres);
+  }
+
+  function updateClassCounts(counts, farmAcres) {
+    // Update the farm filter buttons in the sidebar with real counts
+    var btns = document.querySelectorAll('[data-farm-class]');
+    btns.forEach(function(btn) {
+      var cls = btn.getAttribute('data-farm-class');
+      var countEl = btn.querySelector('.fc-count');
+      if (countEl && counts[cls] !== undefined) {
+        countEl.textContent = String(counts[cls]);
+      }
+    });
+    // Update bottom panel
+    var label = document.getElementById('real-parcel-count-label');
+    if (label) {
+      var total = Object.values(counts).reduce(function(a,b) { return a+b; }, 0);
+      var farmCount = (counts['confirmed-farm'] || 0) + (counts['likely-farm'] || 0);
+      label.innerHTML = 'Parcels: <b>' + total + '</b> · Farms: <b style="color:#4CAF50">' + farmCount + '</b> · <b style="color:#4CAF50">' + Math.round(farmAcres).toLocaleString() + ' ac</b>';
+    }
   }
 
   const EQIP_PRACTICES = {
