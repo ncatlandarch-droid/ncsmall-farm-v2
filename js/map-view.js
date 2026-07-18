@@ -505,7 +505,8 @@
   // tryFetchParcels removed — direct single-proxy fetch above handles everything
 
   function renderParcelGeoJSON(geojson) {
-    if (realParcelLayer) { mapInstance.removeLayer(realParcelLayer); }
+    // Build new layer FIRST, then swap — prevents flash/disappear on pan
+    var oldLayer = realParcelLayer;
 
     // Pre-classify all features once (avoids 3x calls per feature)
     geojson.features.forEach(function(f) {
@@ -540,11 +541,29 @@
         var fc = FARM_CLASS[cls];
 
         // Broad field name search
-        var owner = p.owner || p.ownname || p.OWNER_NAME || p.OWNER || p.OWNERNM || p.ownname1 || p.OWNER1 || p.owname || p.OWN_NAME || 'Unknown';
-        var addr = p.mailadd || p.siteadd || p.SITUS_ADDRESS || p.SITE_ADDR || p.sadd || p.addr1 || p.phyaddr || p.address || p.ADDRESS || p.ADDR || p.phyadd || p.sitead || p.location || p.LOCATION || p.PHYADDR1 || p.staddr || p.STADDR || 'No Address Available';
+        var owner = p.owner || p.ownname || p.OWNER_NAME || p.OWNER || p.OWNERNM || p.ownname1 || p.OWNER1 || p.owname || p.OWN_NAME || 'Unknown Owner';
+        var pin = p.parcelnumb || p.parno || p.PARCEL_ID || p.PIN || p.PARID || p.pin || p.pid || p.PID || p.parcel_id || '';
+        var county = p.cntyname || p.COUNTY || p.county || '';
+        
+        // Address: try many field names, then build a useful fallback
+        var addr = p.mailadd || p.siteadd || p.SITUS_ADDRESS || p.SITE_ADDR || p.sadd || p.addr1 || p.phyaddr || p.address || p.ADDRESS || p.ADDR || p.phyadd || p.sitead || p.PHYADDR1 || p.staddr || p.STADDR || '';
+        if (!addr || !String(addr).trim() || addr === 'null') {
+          // Build from components if available
+          var parts = [];
+          if (p.stnum) parts.push(String(p.stnum).trim());
+          if (p.stname) parts.push(String(p.stname).trim());
+          if (p.stsuffix) parts.push(String(p.stsuffix).trim());
+          if (parts.length > 0) {
+            addr = parts.join(' ');
+            if (p.city) addr += ', ' + p.city;
+          } else {
+            addr = county ? county + ' County' : 'Guilford County';
+            if (pin) addr += ' · PIN ' + pin;
+          }
+        }
+        
         var acres = p.GISACRES || p.gisacres || p.acres || p.CALCACRES || p.ACREAGE || p.Acres || p.calcacres || p.totalacres || p.TOTALACRES || p.lotsize || '0';
         var landUse = p.usedesc || p.parusedesc || p.LAND_USE || p.parusecode || p.landuse || p.LANDUSE || p.proptype || p.PROPTYPE || 'Unknown';
-        var pin = p.parcelnumb || p.parno || p.PARCEL_ID || p.PIN || p.PARID || p.pin || p.pid || p.PID || p.parcel_id || '';
 
         classCounts[cls]++;
         if (cls === 'confirmed-farm' || cls === 'likely-farm') farmAcres += parseFloat(acres) || 0;
@@ -594,6 +613,9 @@
         });
       }
     }).addTo(mapInstance);
+
+    // NOW remove old layer (after new one is on map — no flash)
+    if (oldLayer) { mapInstance.removeLayer(oldLayer); }
 
     updateClassCounts(classCounts, farmAcres);
 

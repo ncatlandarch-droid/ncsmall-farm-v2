@@ -100,18 +100,47 @@ async function arcgisQuery(urls, params) {
  */
 function _normalizeNCOneMap(fc) {
   if (!fc?.features) return fc;
+  
+  // Log first feature's raw field names for debugging
+  if (fc.features.length > 0) {
+    console.log('[gis-proxy] NC OneMap field names:', Object.keys(fc.features[0].properties || {}));
+    console.log('[gis-proxy] NC OneMap first feature sample:', JSON.stringify(fc.features[0].properties, null, 2).substring(0, 800));
+  }
+
   fc.features.forEach(f => {
     const p = f.properties;
     if (!p) return;
+    
     // Map NC OneMap names → parcel card aliases used by _prop()
-    if (p.parno      != null) p.parcelnumb = p.parno;       // id
-    if (p.ownname    != null) p.owner      = p.ownname;     // owner
-    if (p.ownname2   != null) p.OWNER1     = p.ownname2;    // second owner
-    if (p.siteadd    != null) p.mailadd    = p.siteadd;     // address
-    if (p.gisacres   != null) p.GISACRES   = p.gisacres;    // acres
-    if (p.parusedesc != null) p.usedesc    = p.parusedesc;  // land use
-    if (p.parusecode != null) p.usecode    = p.parusecode;  // land use code
-    // parval, cntyname, subdivisio, structyear kept as-is for future use
+    if (p.parno      != null) p.parcelnumb = p.parno;
+    if (p.ownname    != null) p.owner      = p.ownname;
+    if (p.ownname2   != null) p.OWNER1     = p.ownname2;
+    if (p.gisacres   != null) p.GISACRES   = p.gisacres;
+    if (p.parusedesc != null) p.usedesc    = p.parusedesc;
+    if (p.parusecode != null) p.usecode    = p.parusecode;
+    
+    // Address: try siteadd first, then build from components
+    if (p.siteadd && String(p.siteadd).trim()) {
+      p.mailadd = p.siteadd;
+    } else if (p.addr1 && String(p.addr1).trim()) {
+      p.mailadd = p.addr1;
+    } else if (p.phyaddr && String(p.phyaddr).trim()) {
+      p.mailadd = p.phyaddr;
+    } else {
+      // Build from number + street + suffix + city
+      var parts = [];
+      if (p.stnum || p.housenum) parts.push(String(p.stnum || p.housenum).trim());
+      if (p.stname || p.streetname) parts.push(String(p.stname || p.streetname).trim());
+      if (p.stsuffix || p.sttype) parts.push(String(p.stsuffix || p.sttype).trim());
+      if (p.stdir) parts.push(String(p.stdir).trim());
+      if (parts.length > 0) {
+        p.mailadd = parts.join(' ');
+        if (p.city) p.mailadd += ', ' + p.city;
+      } else if (p.mailadd1) {
+        p.mailadd = p.mailadd1;
+      }
+      // If still nothing, leave mailadd unset — client will show fallback
+    }
   });
   return fc;
 }
