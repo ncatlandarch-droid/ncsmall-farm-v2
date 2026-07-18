@@ -375,12 +375,18 @@
   }
 
   /* ── Fetch REAL parcel polygons from gis-proxy ── */
+  var lastZoomToast = 0;
+
   function fetchRealParcels() {
     if (!mapInstance || isFetchingParcels) return;
     var zoom = mapInstance.getZoom();
     if (zoom < 12) {
       if (realParcelLayer) { mapInstance.removeLayer(realParcelLayer); realParcelLayer = null; }
-      showToast('Zoom in to load parcel boundaries', 'info');
+      // Only show "zoom in" toast once per 5 seconds to avoid spam
+      if (Date.now() - lastZoomToast > 5000) {
+        showToast('Zoom in to load parcel boundaries', 'info');
+        lastZoomToast = Date.now();
+      }
       if(document.getElementById('real-parcel-count-label')) {
         document.getElementById('real-parcel-count-label').innerText = 'Parcels in View: 0';
       }
@@ -394,116 +400,88 @@
     if (bbox === lastBbox) return;
     lastBbox = bbox;
     isFetchingParcels = true;
-    showToast('Loading parcels...', 'info');
 
     var w = bounds.getWest().toFixed(6);
     var s = bounds.getSouth().toFixed(6);
     var e = bounds.getEast().toFixed(6);
     var n = bounds.getNorth().toFixed(6);
 
-    var arcgisParams = 'where=1%3D1&geometry=' + w + ',' + s + ',' + e + ',' + n
-      + '&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects'
-      + '&outFields=*&returnGeometry=true&outSR=4326&f=geojson&resultRecordCount=500';
-
-    // Use proxy only — direct county URLs don't resolve from browser (CORS)
-    var urls = [
-      '/.netlify/functions/gis-proxy?service=parcels&bbox=' + w + ',' + s + ',' + e + ',' + n
-    ];
-
-    tryFetchParcels(urls, 0);
-  }
-
-  function tryFetchParcels(urls, idx) {
-    if (idx >= urls.length) {
-      isFetchingParcels = false;
-      showToast('All parcel sources unavailable', 'warn');
-      return;
-    }
-
-    fetch(urls[idx], { signal: AbortSignal.timeout ? AbortSignal.timeout(8000) : undefined })
+    fetch('/.netlify/functions/gis-proxy?service=parcels&bbox=' + w + ',' + s + ',' + e + ',' + n,
+      { signal: AbortSignal.timeout ? AbortSignal.timeout(12000) : undefined })
       .then(function(resp) {
         if (!resp.ok) throw new Error('HTTP ' + resp.status);
         return resp.json();
       })
       .then(function(geojson) {
+        isFetchingParcels = false;
         if (!geojson || !geojson.features || !geojson.features.length) {
-          throw new Error('empty');
+          showToast('No parcels found in this area', 'info');
+          return;
         }
         totalRealParcelsInView = geojson.features.length;
         if(document.getElementById('real-parcel-count-label')) {
-            document.getElementById('real-parcel-count-label').innerText = `Parcels in View: ${totalRealParcelsInView}`;
+          document.getElementById('real-parcel-count-label').innerText = 'Parcels in View: ' + totalRealParcelsInView;
         }
         renderParcelGeoJSON(geojson);
-        var src = idx === 0 ? 'proxy' : (urls[idx].includes('guilford') ? 'Guilford County GIS' : 'NC OneMap');
-        showToast(geojson.features.length + ' parcels loaded (' + src + ')', 'success');
-        isFetchingParcels = false;
+        showToast(geojson.features.length + ' parcels loaded', 'success');
       })
       .catch(function(err) {
-        console.warn('[NCSmall Map] Source ' + idx + ' failed:', err.message, urls[idx].substring(0, 60));
-        tryFetchParcels(urls, idx + 1);
+        isFetchingParcels = false;
+        console.warn('[NCSmall Map] Parcel fetch failed:', err.message);
+        showToast('Parcel loading failed — try again', 'warn');
       });
   }
+
+  // tryFetchParcels removed — direct single-proxy fetch above handles everything
 
   function renderParcelGeoJSON(geojson) {
     if (realParcelLayer) { mapInstance.removeLayer(realParcelLayer); }
 
-    // Track classification counts
+    // Pre-classify all features once (avoids 3x calls per feature)
+    geojson.features.forEach(function(f) {
+      var p = f.properties || {};
+      var landUse = p.usedesc || p.parusedesc || p.LAND_USE || p.parusecode || '';
+      var useCode = p.usecode || p.parusecode || p.LAND_USE_CODE || p.LUSECODE || '';
+      var acres = p.GISACRES || p.gisacres || p.acres || p.CALCACRES || '0';
+      f._ncClass = classifyParcel(landUse, acres, useCode);
+    });
+
     var classCounts = { 'confirmed-farm': 0, 'likely-farm': 0, 'potential-farm': 0, 'non-agricultural': 0 };
     var farmAcres = 0;
-    var debugLandUses = {};
 
     realParcelLayer = L.geoJSON(geojson, {
       style: function(feature) {
-        var p = feature.properties || {};
-        var landUse = p.usedesc || p.parusedesc || p.LAND_USE || p.parusecode || '';
-        var useCode = p.usecode || p.parusecode || p.LAND_USE_CODE || p.LUSECODE || '';
-        var acres = p.GISACRES || p.gisacres || p.acres || p.CALCACRES || '0';
-        var cls = classifyParcel(landUse, acres, useCode);
+        var cls = feature._ncClass;
         var fc = FARM_CLASS[cls];
-        
-        // Debug: track what land use values we see
-        var key = landUse || useCode || '(empty)';
-        debugLandUses[key] = (debugLandUses[key] || 0) + 1;
-
         if (cls === 'non-agricultural') {
-          return { color: '#78909C', weight: 1, fillColor: '#78909C', fillOpacity: 0.05, opacity: 0.4 };
+          return { color: '#78909C', weight: 0.8, fillColor: '#78909C', fillOpacity: 0.03, opacity: 0.3 };
         }
         return {
-          color: '#FDB927',       // Gold outline on farm parcels
+          color: '#FDB927',
           weight: 2.5,
-          fillColor: fc.color,    // Bold classification color fill
-          fillOpacity: 0.4,       // Strong visible fill
+          fillColor: fc.color,
+          fillOpacity: 0.4,
           opacity: 0.9
         };
       },
       onEachFeature: function(feature, layer) {
         var p = feature.properties || {};
-        
-        // Debug: log first parcel's raw field names so we can see what comes back
-        if (classCounts['confirmed-farm'] + classCounts['likely-farm'] + classCounts['potential-farm'] + classCounts['non-agricultural'] === 0) {
-          console.log('[NCSmall] FIRST PARCEL RAW PROPERTIES:', JSON.stringify(p, null, 2));
-          console.log('[NCSmall] ALL FIELD NAMES:', Object.keys(p));
-        }
+        var cls = feature._ncClass;
+        var fc = FARM_CLASS[cls];
 
-        // Broad field name search — NC GIS uses many variations
+        // Broad field name search
         var owner = p.owner || p.ownname || p.OWNER_NAME || p.OWNER || p.OWNERNM || p.ownname1 || p.OWNER1 || p.owname || p.OWN_NAME || 'Unknown';
         var addr = p.mailadd || p.siteadd || p.SITUS_ADDRESS || p.SITE_ADDR || p.sadd || p.addr1 || p.phyaddr || p.address || p.ADDRESS || p.ADDR || p.phyadd || p.sitead || p.location || p.LOCATION || p.PHYADDR1 || p.staddr || p.STADDR || 'No Address Available';
         var acres = p.GISACRES || p.gisacres || p.acres || p.CALCACRES || p.ACREAGE || p.Acres || p.calcacres || p.totalacres || p.TOTALACRES || p.lotsize || '0';
-        var landUse = p.usedesc || p.parusedesc || p.LAND_USE || p.parusecode || p.landuse || p.LANDUSE || p.lu || p.LU || p.proptype || p.PROPTYPE || p.class || p.CLASS || 'Unknown';
-        var useCode = p.usecode || p.parusecode || p.LAND_USE_CODE || p.LUSECODE || p.luc || p.LUC || '';
+        var landUse = p.usedesc || p.parusedesc || p.LAND_USE || p.parusecode || p.landuse || p.LANDUSE || p.proptype || p.PROPTYPE || 'Unknown';
         var pin = p.parcelnumb || p.parno || p.PARCEL_ID || p.PIN || p.PARID || p.pin || p.pid || p.PID || p.parcel_id || '';
-        var cls = classifyParcel(landUse, acres, useCode);
-        var fc = FARM_CLASS[cls];
 
-        // Track counts
         classCounts[cls]++;
         if (cls === 'confirmed-farm' || cls === 'likely-farm') farmAcres += parseFloat(acres) || 0;
 
-        // Classification badge
         var badge = '<span style="padding:3px 8px;border-radius:4px;font-size:10px;font-weight:700;'
           + 'background:' + fc.color + '22;color:' + fc.color + ';border:1px solid ' + fc.color + '44;">' + fc.label + '</span>';
         
-        // Escape quotes for onclick
         var safeOwner = owner.replace(/'/g, "\\'").replace(/"/g, '&quot;');
         var safeAddr = addr.replace(/'/g, "\\'").replace(/"/g, '&quot;');
 
@@ -512,47 +490,42 @@
           + '<div style="font-size:11px;color:#94a3b8;margin-bottom:6px;">' + addr + '</div>'
           + '<div style="display:flex;gap:6px;align-items:center;margin-bottom:10px;">' + badge
           + (pin ? '<span style="font-size:10px;color:#64748b;">PIN: ' + pin + '</span>' : '') + '</div>'
-          
           + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">'
           + '<div><div style="font-size:9px;color:#94a3b8;text-transform:uppercase;">Acreage</div><div style="font-weight:800;font-size:14px;">' + parseFloat(acres).toFixed(2) + ' ac</div></div>'
           + '<div><div style="font-size:9px;color:#94a3b8;text-transform:uppercase;">Land Use</div><div style="font-size:11px;font-weight:600;color:' + fc.color + ';">' + landUse + '</div></div>'
           + '</div>'
-          
           + '<div id="tax-data-' + pin + '" style="margin-bottom:12px; padding: 8px; background: rgba(0,70,132,0.05); border-radius: 6px;">'
           + '<div style="font-size:11px;color:#64748b;display:flex;align-items:center;gap:4px;"><span class="material-icons-round" style="font-size:14px;">sync</span> Loading tax data...</div>'
           + '</div>'
-
           + '<div style="display:flex;gap:6px;margin-bottom:12px;">'
           + '<a href="https://gisdv.guilfordcountync.gov/Guilford/?pin=' + pin + '" target="_blank" style="flex:1;text-align:center;padding:6px;background:#e2e8f0;color:#334155;border-radius:4px;font-size:10px;font-weight:bold;text-decoration:none;">View on County GIS</a>'
           + '<a href="https://lrcpwa.ncptscloud.com/guilford/" target="_blank" style="flex:1;text-align:center;padding:6px;background:#e2e8f0;color:#334155;border-radius:4px;font-size:10px;font-weight:bold;text-decoration:none;">View Tax Record</a>'
           + '</div>'
-
           + '<button onclick="window.openIntakeForm(\'' + pin + '\', \'' + safeOwner + '\', \'' + safeAddr + '\', \'' + acres + '\')" style="width:100%;padding:10px;background:#3B7A57;color:white;border:none;border-radius:8px;font-weight:800;font-size:12px;cursor:pointer;font-family:Inter,sans-serif;box-shadow:0 4px 12px rgba(59,122,87,0.3);">🌱 This Is My Farm — Start Assessment</button>'
           + '</div>';
           
-        layer.bindPopup(popupContent, { maxWidth: 320, autoPan: true, autoPanPadding: [40, 150], autoPanPaddingTopLeft: [40, 150] });
+        layer.bindPopup(popupContent, { maxWidth: 320, maxHeight: 400, autoPan: true, autoPanPadding: [60, 160], autoPanPaddingTopLeft: [60, 160], keepInView: true });
 
         layer.on('popupopen', function() {
            if (pin) fetchEnrichedTaxData(pin, acres, landUse);
         });
 
-        // Store classification for mouseout restore
+        // Correct mouseout style per classification
         layer._ncClass = cls;
         layer.on('mouseover', function() {
           this.setStyle({ weight: 4, fillOpacity: 0.55, color: '#FFD700' });
         });
         layer.on('mouseout', function() {
-          var c = FARM_CLASS[this._ncClass] || FARM_CLASS['confirmed-farm'];
-          this.setStyle({ weight: 2.5, fillOpacity: 0.4, color: '#FDB927' });
+          if (this._ncClass === 'non-agricultural') {
+            this.setStyle({ color: '#78909C', weight: 0.8, fillOpacity: 0.03, opacity: 0.3 });
+          } else {
+            this.setStyle({ weight: 2.5, fillOpacity: 0.4, color: '#FDB927' });
+          }
         });
       }
     }).addTo(mapInstance);
 
-    // Update legend counts
     updateClassCounts(classCounts, farmAcres);
-    // Debug: show what land use values we got from GIS
-    console.log('[NCSmall] Land use values from GIS:', debugLandUses);
-    console.log('[NCSmall] Classification counts:', classCounts);
   }
 
   function updateClassCounts(counts, farmAcres) {
