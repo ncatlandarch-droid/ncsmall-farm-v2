@@ -308,8 +308,12 @@
     L.control.zoom({ position: 'bottomright' }).addTo(mapInstance);
     parcelPolygonGroup = L.layerGroup().addTo(mapInstance);
 
-    mapInstance.on('moveend', fetchRealParcels);
-    mapInstance.on('zoomend', fetchRealParcels);
+    // Debounced parcel fetch — prevents glitchy rapid re-fetches during pan/zoom
+    var fetchDebounceTimer = null;
+    mapInstance.on('moveend', function() {
+      clearTimeout(fetchDebounceTimer);
+      fetchDebounceTimer = setTimeout(fetchRealParcels, 300);
+    });
 
     setTimeout(function() {
       if (mapInstance) {
@@ -374,10 +378,12 @@
   function fetchRealParcels() {
     if (!mapInstance || isFetchingParcels) return;
     var zoom = mapInstance.getZoom();
-    if (zoom < 14) {
+    if (zoom < 12) {
       if (realParcelLayer) { mapInstance.removeLayer(realParcelLayer); realParcelLayer = null; }
       showToast('Zoom in to load parcel boundaries', 'info');
-      document.getElementById('real-parcel-count-label').innerText = `Parcels in View: 0`;
+      if(document.getElementById('real-parcel-count-label')) {
+        document.getElementById('real-parcel-count-label').innerText = 'Parcels in View: 0';
+      }
       return;
     }
 

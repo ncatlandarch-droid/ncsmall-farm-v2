@@ -29,7 +29,9 @@ export default async (request) => {
   if (parts.length !== 4 || parts.some(isNaN)) return json({ error: 'Invalid bbox' }, 400);
   const [west, south, east, north] = parts;
 
-  if ((east - west) > MAX_BBOX_DEG || (north - south) > MAX_BBOX_DEG) {
+  // Parcels have their own 500-record cap; skip bbox limit for them.
+  // Other GIS layers still need the bbox limit to avoid huge responses.
+  if (service !== 'parcels' && ((east - west) > MAX_BBOX_DEG || (north - south) > MAX_BBOX_DEG)) {
     return json({ error: 'bbox_too_large', message: 'Zoom in to load GIS data' }, 400);
   }
 
