@@ -20,6 +20,10 @@
   let parcelsVisible = true;
   let labelsVisible = true;
   let farmPinData = []; // cached farm centroids for wide-zoom pins
+  let directoryVisible = false;
+  let directorySearchText = '';
+  let totalDynamicFarmCount = 0;
+  let totalDynamicFarmAcres = 0;
 
   /* ── Farm Classification from land use ────────────────────── */
   const FARM_CLASS = {
@@ -80,13 +84,66 @@
           }, 'search'),
           h('input', {
             id: 'nc-search-input',
-            type: 'text', placeholder: 'Enter address, city, or PIN...',
+            type: 'text', placeholder: 'Search address, owner, or PIN...',
             style: { flex: '1', border: 'none', outline: 'none', background: 'transparent', color: '#f8fafc', fontSize: '13px', fontWeight: '500', padding: '10px 12px 10px 0', fontFamily: 'Inter, sans-serif' },
             value: filterText,
             onInput: (e) => { filterText = e.target.value; },
             onKeyDown: (e) => { if (e.key === 'Enter' && filterText.trim()) geocodeAddress(filterText); }
           })
         )
+      ),
+
+      // ── Dashboard Banner ──
+      h('div', { id: 'farm-dashboard-banner', className: 'farm-dashboard-banner', style: { top: '56px' } },
+        h('div', { className: 'dashboard-stat' },
+          h('div', { id: 'dash-farm-count', className: 'stat-value' }, '—'),
+          h('div', { className: 'stat-label' }, 'Farm Parcels')
+        ),
+        h('div', { className: 'dashboard-stat' },
+          h('div', { id: 'dash-total-acres', className: 'stat-value' }, '—'),
+          h('div', { className: 'stat-label' }, 'Total Acres')
+        ),
+        h('div', { className: 'dashboard-stat' },
+          h('div', { id: 'dash-avg-size', className: 'stat-value' }, '—'),
+          h('div', { className: 'stat-label' }, 'Avg Farm Size')
+        ),
+        h('div', { className: 'dashboard-stat' },
+          h('div', { id: 'dash-county', className: 'stat-value', style: { color: '#FDB927', fontSize: '14px' } }, 'Guilford'),
+          h('div', { className: 'stat-label' }, 'County')
+        )
+      ),
+
+      // ── Left: Farm Directory Toggle Button ──
+      h('button', {
+        id: 'directory-toggle-btn',
+        onclick: () => { directoryVisible = !directoryVisible; toggleDirectoryPanel(); },
+        style: { position: 'absolute', top: '56px', left: '12px', zIndex: '1001', background: 'rgba(10,14,23,0.9)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '8px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', color: '#f8fafc', fontFamily: 'Inter, sans-serif', fontSize: '11px', fontWeight: '700', boxShadow: '0 4px 12px rgba(0,0,0,0.3)' }
+      },
+        h('span', { className: 'material-icons-round', style: { fontSize: '16px', color: '#4CAF50' } }, 'list'),
+        'Farm Directory'
+      ),
+
+      // ── Left: Farm Directory Panel ──
+      h('div', { id: 'farm-directory-panel', className: 'farm-directory-panel collapsed' },
+        h('div', { className: 'farm-directory-header' },
+          h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } },
+            h('div', { style: { fontSize: '12px', fontWeight: '800', color: '#f8fafc', textTransform: 'uppercase', letterSpacing: '0.08em' } }, 'Farm Directory'),
+            h('button', {
+              onclick: () => { directoryVisible = false; toggleDirectoryPanel(); },
+              style: { background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', padding: '4px' }
+            }, h('span', { className: 'material-icons-round', style: { fontSize: '18px' } }, 'close'))
+          ),
+          h('div', { id: 'directory-summary', style: { fontSize: '10px', color: '#4CAF50', fontWeight: '600', marginTop: '4px' } }, 'Loading farms...'),
+          h('div', { className: 'farm-directory-search', style: { marginTop: '8px' } },
+            h('span', { className: 'material-icons-round', style: { padding: '6px 8px', color: '#64748b', fontSize: '16px' } }, 'search'),
+            h('input', {
+              id: 'directory-search-input',
+              type: 'text', placeholder: 'Filter by owner, address, type...',
+              onInput: (e) => { directorySearchText = e.target.value; renderDirectoryList(); }
+            })
+          )
+        ),
+        h('div', { id: 'farm-directory-list', className: 'farm-directory-list' })
       ),
 
       // ── Right: Layers + Farm Filter Panel ──
@@ -131,11 +188,11 @@
       ),
 
       // ── Bottom Left: Portfolio Stats ──
-      h('div', { style: { position: 'absolute', bottom: '20px', left: '12px', zIndex: '1000', width: '230px' } },
+      h('div', { style: { position: 'absolute', bottom: '20px', left: '12px', zIndex: '1000', maxWidth: '320px' } },
         panel(
           secTitle('Real-Time Data'),
-          h('div', { id: 'real-parcel-count-label', style: { fontSize: '13px', fontWeight: '800', color: '#f8fafc', padding: '8px 0' } }, `Parcels in View: ${totalRealParcelsInView}`),
-          h('div', { style: { fontSize: '11px', color: '#94a3b8', lineHeight: '1.4' } }, 'Zoom in and click any parcel to load enriched tax and assessment data.')
+          h('div', { id: 'real-parcel-count-label', style: { fontSize: '12px', fontWeight: '800', color: '#f8fafc', padding: '6px 0' } }, 'Loading farm data...'),
+          h('div', { style: { fontSize: '10px', color: '#94a3b8', lineHeight: '1.4' } }, 'Zoom in and click any parcel to load enriched tax and assessment data.')
         )
       ),
 
@@ -317,7 +374,18 @@
     // Store layer refs so toggles can control them
     satelliteLayer = L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { maxZoom: 21 }).addTo(mapInstance);
     labelsLayer = L.tileLayer('https://mt1.google.com/vt/lyrs=h&x={x}&y={y}&z={z}', { maxZoom: 21, opacity: 0.4 }).addTo(mapInstance);
-    farmPinsLayer = L.layerGroup().addTo(mapInstance);
+    // Use MarkerClusterGroup if available, fallback to plain layerGroup
+    if (L.markerClusterGroup) {
+      farmPinsLayer = L.markerClusterGroup({
+        maxClusterRadius: 50,
+        spiderfyOnMaxZoom: true,
+        showCoverageOnHover: false,
+        zoomToBoundsOnClick: true,
+        disableClusteringAtZoom: 15
+      }).addTo(mapInstance);
+    } else {
+      farmPinsLayer = L.layerGroup().addTo(mapInstance);
+    }
 
     L.control.zoom({ position: 'bottomright' }).addTo(mapInstance);
     parcelPolygonGroup = L.layerGroup().addTo(mapInstance);
@@ -384,17 +452,20 @@
         });
         
         // Calculate total acreage
-        var totalAcres = 0;
-        dynamicFarms.forEach(function(f) { totalAcres += parseFloat(f.acres) || 0; });
+        totalDynamicFarmAcres = 0;
+        dynamicFarms.forEach(function(f) { totalDynamicFarmAcres += parseFloat(f.acres) || 0; });
+        totalDynamicFarmCount = dynamicFarms.length;
         
-        console.log('[NCSmall Map] Dynamic farms loaded: ' + dynamicFarms.length + ' (' + Math.round(totalAcres).toLocaleString() + ' acres)');
-        showToast(dynamicFarms.length + ' farms · ' + Math.round(totalAcres).toLocaleString() + ' acres in region', 'success');
+        console.log('[NCSmall Map] Dynamic farms loaded: ' + totalDynamicFarmCount + ' (' + Math.round(totalDynamicFarmAcres).toLocaleString() + ' acres)');
+        showToast(totalDynamicFarmCount.toLocaleString() + ' farms · ' + Math.round(totalDynamicFarmAcres).toLocaleString() + ' acres discovered', 'success');
         updateFarmPinsVisibility();
+        updateDashboardBanner();
+        renderDirectoryList();
         
         // Update bottom status with TOTAL farm data
         var el = document.getElementById('real-parcel-count-label');
         if (el) {
-          el.innerHTML = 'Farm Parcels: <b style="color:#4CAF50">' + dynamicFarms.length.toLocaleString() + '</b> · Total Acreage: <b style="color:#4CAF50">' + Math.round(totalAcres).toLocaleString() + ' ac</b>';
+          el.innerHTML = 'Farm Parcels: <b style="color:#4CAF50">' + totalDynamicFarmCount.toLocaleString() + '</b> · <b style="color:#4CAF50">' + Math.round(totalDynamicFarmAcres).toLocaleString() + ' ac</b>';
         }
       })
       .catch(function(err) {
@@ -636,7 +707,7 @@
           + '<button onclick="window.openIntakeForm(\'' + pin + '\', \'' + safeOwner + '\', \'' + safeAddr + '\', \'' + acres + '\')" style="width:100%;padding:10px;background:#3B7A57;color:white;border:none;border-radius:8px;font-weight:800;font-size:12px;cursor:pointer;font-family:Inter,sans-serif;box-shadow:0 4px 12px rgba(59,122,87,0.3);">🌱 This Is My Farm — Start Assessment</button>'
           + '</div>';
           
-        layer.bindPopup(popupContent, { maxWidth: 320, maxHeight: 400, autoPan: true, autoPanPadding: [60, 160], autoPanPaddingTopLeft: [60, 160], keepInView: true });
+        layer.bindPopup(popupContent, { maxWidth: 340, maxHeight: 480, autoPan: true, autoPanPadding: [80, 80], autoPanPaddingTopLeft: [80, 120], autoPanPaddingBottomRight: [80, 40], keepInView: true, className: 'ncsmall-popup' });
 
         layer.on('popupopen', function() {
            if (pin) fetchEnrichedTaxData(pin, acres, landUse);
@@ -840,6 +911,99 @@
     document.body.appendChild(toast);
     setTimeout(function() { if (toast.parentNode) toast.remove(); }, 3000);
   }
+
+  /* ── Dashboard Banner ─────────────────────────────────────── */
+  function updateDashboardBanner() {
+    var countEl = document.getElementById('dash-farm-count');
+    var acresEl = document.getElementById('dash-total-acres');
+    var avgEl = document.getElementById('dash-avg-size');
+    
+    if (countEl) countEl.textContent = totalDynamicFarmCount.toLocaleString();
+    if (acresEl) acresEl.textContent = Math.round(totalDynamicFarmAcres).toLocaleString();
+    if (avgEl && totalDynamicFarmCount > 0) {
+      avgEl.textContent = (totalDynamicFarmAcres / totalDynamicFarmCount).toFixed(1) + ' ac';
+    }
+  }
+
+  /* ── Farm Directory Panel ─────────────────────────────────── */
+  function toggleDirectoryPanel() {
+    var panel = document.getElementById('farm-directory-panel');
+    var btn = document.getElementById('directory-toggle-btn');
+    if (!panel) return;
+    
+    if (directoryVisible) {
+      panel.classList.remove('collapsed');
+      if (btn) btn.style.display = 'none';
+    } else {
+      panel.classList.add('collapsed');
+      if (btn) btn.style.display = 'flex';
+    }
+  }
+
+  function renderDirectoryList() {
+    var listEl = document.getElementById('farm-directory-list');
+    var summaryEl = document.getElementById('directory-summary');
+    if (!listEl) return;
+
+    var query = (directorySearchText || '').toLowerCase().trim();
+    
+    // Filter farms by search text
+    var filtered = dynamicFarms;
+    if (query) {
+      filtered = dynamicFarms.filter(function(f) {
+        return (f.name || '').toLowerCase().includes(query) ||
+               (f.addr || '').toLowerCase().includes(query) ||
+               (f.type || '').toLowerCase().includes(query) ||
+               (f.pin || '').toLowerCase().includes(query);
+      });
+    }
+
+    // Sort by acreage descending
+    filtered.sort(function(a, b) { return (parseFloat(b.acres) || 0) - (parseFloat(a.acres) || 0); });
+
+    // Update summary
+    if (summaryEl) {
+      var totalFilteredAcres = 0;
+      filtered.forEach(function(f) { totalFilteredAcres += parseFloat(f.acres) || 0; });
+      summaryEl.textContent = filtered.length.toLocaleString() + ' farms · ' + Math.round(totalFilteredAcres).toLocaleString() + ' acres' + (query ? ' (filtered)' : '');
+    }
+
+    // Render list (limit to 200 for performance)
+    var displayCount = Math.min(filtered.length, 200);
+    var html = '';
+    
+    for (var i = 0; i < displayCount; i++) {
+      var farm = filtered[i];
+      var acStr = farm.acres ? parseFloat(farm.acres).toFixed(1) + ' ac' : '';
+      var typeLabel = (farm.type || 'Farm').replace(/FARM DEFERRED/i, 'Farm Deferred').replace(/AGRI\/HORT/i, 'Agri/Hort');
+      
+      html += '<div class="farm-directory-item" data-farm-idx="' + i + '" onclick="window._zoomToFarm(' + farm.lat + ',' + farm.lng + ')">'
+        + '<div class="farm-name">' + (farm.name || 'Unknown Owner') + '</div>'
+        + '<div class="farm-meta">'
+        + '<span class="farm-acres">' + acStr + '</span>'
+        + '<span class="farm-type">' + typeLabel + '</span>'
+        + '</div>'
+        + '<div style="font-size:9px;color:#64748b;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + (farm.addr || '') + '</div>'
+        + '</div>';
+    }
+
+    if (filtered.length > 200) {
+      html += '<div style="padding:12px;text-align:center;font-size:10px;color:#94a3b8;">Showing 200 of ' + filtered.length.toLocaleString() + ' — use search to narrow</div>';
+    }
+
+    if (filtered.length === 0) {
+      html = '<div style="padding:20px;text-align:center;font-size:12px;color:#64748b;">No farms match your search</div>';
+    }
+
+    listEl.innerHTML = html;
+  }
+
+  // Global zoom-to-farm function for directory clicks
+  window._zoomToFarm = function(lat, lng) {
+    if (mapInstance) {
+      mapInstance.flyTo([lat, lng], 16, { duration: 1.2 });
+    }
+  };
 
 })();
 

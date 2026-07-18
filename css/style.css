@@ -641,3 +641,232 @@ ul, ol { list-style: none; }
 .leading-relaxed { line-height: 1.625; }
 .leading-tight { line-height: 1.25; }
 
+/* ── Leaflet Popup Overrides ── */
+.leaflet-popup-content-wrapper {
+  background: rgba(10, 14, 23, 0.95) !important;
+  backdrop-filter: blur(20px) !important;
+  border: 1px solid rgba(255,255,255,0.1) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 12px 48px rgba(0,0,0,0.6) !important;
+  color: #f8fafc !important;
+  padding: 0 !important;
+}
+.leaflet-popup-content {
+  margin: 0 !important;
+  max-height: calc(100vh - 180px) !important;
+  overflow-y: auto !important;
+  scrollbar-width: thin;
+  scrollbar-color: #475569 transparent;
+}
+.leaflet-popup-content::-webkit-scrollbar {
+  width: 4px;
+}
+.leaflet-popup-content::-webkit-scrollbar-thumb {
+  background: #475569;
+  border-radius: 4px;
+}
+.leaflet-popup-tip {
+  background: rgba(10, 14, 23, 0.95) !important;
+  box-shadow: none !important;
+}
+.leaflet-popup-close-button {
+  color: #94a3b8 !important;
+  font-size: 20px !important;
+  padding: 8px !important;
+  top: 4px !important;
+  right: 4px !important;
+  z-index: 10;
+}
+.leaflet-popup-close-button:hover {
+  color: #f8fafc !important;
+}
+
+/* ── MarkerCluster Overrides ── */
+.marker-cluster-small {
+  background-color: rgba(46, 125, 50, 0.5) !important;
+}
+.marker-cluster-small div {
+  background-color: rgba(46, 125, 50, 0.85) !important;
+  color: #fff !important;
+  font-family: Inter, sans-serif !important;
+  font-weight: 800 !important;
+  font-size: 12px !important;
+}
+.marker-cluster-medium {
+  background-color: rgba(76, 175, 80, 0.5) !important;
+}
+.marker-cluster-medium div {
+  background-color: rgba(76, 175, 80, 0.85) !important;
+  color: #fff !important;
+  font-family: Inter, sans-serif !important;
+  font-weight: 800 !important;
+  font-size: 13px !important;
+}
+.marker-cluster-large {
+  background-color: rgba(0, 70, 132, 0.5) !important;
+}
+.marker-cluster-large div {
+  background-color: rgba(0, 70, 132, 0.85) !important;
+  color: #fff !important;
+  font-family: Inter, sans-serif !important;
+  font-weight: 800 !important;
+  font-size: 14px !important;
+}
+
+/* ── Farm Directory Panel ── */
+.farm-directory-panel {
+  position: absolute;
+  top: 60px;
+  left: 12px;
+  z-index: 1000;
+  width: 320px;
+  max-height: calc(100vh - 160px);
+  background: rgba(10, 14, 23, 0.95);
+  backdrop-filter: blur(20px);
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.08);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s;
+}
+.farm-directory-panel.collapsed {
+  transform: translateX(-340px);
+  opacity: 0;
+  pointer-events: none;
+}
+.farm-directory-header {
+  padding: 14px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  flex-shrink: 0;
+}
+.farm-directory-search {
+  display: flex;
+  align-items: center;
+  background: rgba(255,255,255,0.06);
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.08);
+  margin-top: 8px;
+  overflow: hidden;
+}
+.farm-directory-search input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: #f8fafc;
+  font-size: 12px;
+  padding: 8px 10px;
+  font-family: Inter, sans-serif;
+}
+.farm-directory-search input::placeholder {
+  color: #64748b;
+}
+.farm-directory-list {
+  overflow-y: auto;
+  flex: 1;
+  scrollbar-width: thin;
+  scrollbar-color: #475569 transparent;
+}
+.farm-directory-list::-webkit-scrollbar {
+  width: 4px;
+}
+.farm-directory-list::-webkit-scrollbar-thumb {
+  background: #475569;
+  border-radius: 4px;
+}
+.farm-directory-item {
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.farm-directory-item:hover {
+  background: rgba(255,255,255,0.06);
+}
+.farm-directory-item .farm-name {
+  font-size: 12px;
+  font-weight: 700;
+  color: #f8fafc;
+  margin-bottom: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.farm-directory-item .farm-meta {
+  font-size: 10px;
+  color: #64748b;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.farm-directory-item .farm-meta .farm-acres {
+  color: #4CAF50;
+  font-weight: 600;
+}
+.farm-directory-item .farm-meta .farm-type {
+  color: #94a3b8;
+  text-transform: uppercase;
+  font-size: 9px;
+  letter-spacing: 0.05em;
+}
+
+/* ── Dashboard Banner ── */
+.farm-dashboard-banner {
+  position: absolute;
+  top: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 999;
+  display: flex;
+  gap: 2px;
+  background: rgba(10, 14, 23, 0.9);
+  backdrop-filter: blur(16px);
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.08);
+  padding: 8px 16px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+}
+.dashboard-stat {
+  text-align: center;
+  padding: 0 16px;
+  border-right: 1px solid rgba(255,255,255,0.06);
+}
+.dashboard-stat:last-child {
+  border-right: none;
+}
+.dashboard-stat .stat-value {
+  font-size: 18px;
+  font-weight: 900;
+  color: #4CAF50;
+  line-height: 1.2;
+}
+.dashboard-stat .stat-label {
+  font-size: 9px;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+}
+
+@media (max-width: 768px) {
+  .farm-directory-panel {
+    width: calc(100vw - 24px);
+    top: auto;
+    bottom: 60px;
+    left: 12px;
+    max-height: 50vh;
+  }
+  .farm-directory-panel.collapsed {
+    transform: translateY(100%);
+  }
+  .farm-dashboard-banner {
+    width: calc(100vw - 24px);
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .dashboard-stat {
+    padding: 4px 10px;
+  }
+}
