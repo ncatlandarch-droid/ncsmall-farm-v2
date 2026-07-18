@@ -19,14 +19,19 @@
       { label: 'RESOURCES', view: 'resources' }
     ];
 
+    // Admin mode: add ESP Dashboard tab
     if (st.mode === 'admin') {
-      navItems.push({ label: 'ESP DASHBOARD', view: 'esp-dashboard' });
+      navItems.splice(2, 0, { label: 'ESP DASHBOARD', view: 'esp-dashboard', badge: true });
     }
 
     // Desktop nav tabs — text only, active = blue pill (matches original)
     const tabs = h('nav', { style: { display: 'flex', alignItems: 'center', gap: '4px' }, className: 'hidden md:flex' },
       navItems.map(tab => {
         const isActive = st.view === tab.view;
+        const children = [tab.label];
+        if (tab.badge) {
+          children.push(h('span', { style: { display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%', background: '#FDB927', marginLeft: '4px', verticalAlign: 'super' } }));
+        }
         const btn = h('button', {
           style: {
             padding: '6px 14px',
@@ -44,7 +49,7 @@
           onclick: () => window.setView(tab.view),
           onmouseenter: function() { if (!isActive) this.style.background = '#f1f5f9'; },
           onmouseleave: function() { if (!isActive) this.style.background = 'transparent'; }
-        }, tab.label);
+        }, ...children);
         return btn;
       })
     );

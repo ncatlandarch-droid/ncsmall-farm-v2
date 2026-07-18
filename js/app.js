@@ -106,8 +106,8 @@
     // Set mode on body
     document.body.setAttribute('data-mode', st.mode);
     
-    if (st.mode === 'professional') {
-        window.loadCesium();
+    if (st.mode === 'admin') {
+        // CesiumJS will lazy-load in future design phase, not on mode switch
     }
 
     // Destroy Leaflet before DOM wipe (innerHTML='' kills the container)
@@ -153,9 +153,7 @@
             st.mode = 'community';
         } else {
             const role = user.role || 'community';
-            if (role === 'planner') {
-                st.mode = 'professional';
-            } else if (role === 'admin') {
+            if (role === 'planner' || role === 'admin') {
                 st.mode = 'admin';
             } else {
                 st.mode = 'community';
