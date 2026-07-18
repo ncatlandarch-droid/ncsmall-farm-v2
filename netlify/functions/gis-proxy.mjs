@@ -180,40 +180,77 @@ async function fetchFarms(w, s, e, n) {
     "parusedesc LIKE '%CONSERV%'"
   ].join(' OR ');
 
+  const ncOneMapUrl = 'https://services.nconemap.gov/secure/rest/services/NC1Map_Parcels/FeatureServer/1/query';
+
+  // Strategy: fetch with geometry but use geometryPrecision to keep response small
   const params = new URLSearchParams({
     where:          farmWhere,
     geometry:       `${w},${s},${e},${n}`,
     geometryType:   'esriGeometryEnvelope',
     inSR:           '4326',
     spatialRel:     'esriSpatialRelIntersects',
-    outFields:      'parno,ownname,siteadd,saddno,saddpref,saddstname,saddsttyp,saddstsuf,scity,mailadd,mcity,gisacres,parusedesc,parusecode,cntyname,parval,improvval,landval',
+    outFields:      'parno,ownname,siteadd,saddno,saddstname,saddsttyp,scity,mailadd,mcity,gisacres,parusedesc,cntyname',
     returnGeometry: 'true',
     outSR:          '4326',
-    f:              'geojson',
+    geometryPrecision: '4',
+    maxAllowableOffset: '0.0005',
+    f:              'json',
     resultRecordCount: '2000',
   });
 
-  const ncOneMapUrl = 'https://services.nconemap.gov/secure/rest/services/NC1Map_Parcels/FeatureServer/1/query';
-
   try {
-    const resp = await fetch(`${ncOneMapUrl}?${params}`);
+    console.log('[gis-proxy] Fetching farms from NC OneMap...');
+    const resp = await fetch(`${ncOneMapUrl}?${params}`, { signal: AbortSignal.timeout(15000) });
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const data = await resp.json();
     
     if (data.error) throw new Error(data.error.message || 'ArcGIS error');
-    
-    // Convert to GeoJSON if needed
-    let fc = data;
-    if (data.features && !data.type) {
-      fc = { type: 'FeatureCollection', features: data.features };
+    if (!data.features || data.features.length === 0) {
+      console.log('[gis-proxy] Farms query: 0 features');
+      return geojsonResp({ type: 'FeatureCollection', features: [] });
     }
-    
-    console.log(`[gis-proxy] Farms query returned ${fc.features?.length || 0} farm parcels`);
-    
-    // Normalize field names
-    _normalizeNCOneMap(fc);
-    
-    return geojsonResp(fc);
+
+    console.log(`[gis-proxy] Farms query: ${data.features.length} raw features`);
+
+    // Convert ArcGIS JSON (rings) to GeoJSON Points (centroids only — for pins)
+    const features = [];
+    for (const f of data.features) {
+      const attrs = f.attributes || {};
+      const rings = f.geometry?.rings;
+      if (!rings || rings.length === 0) continue;
+
+      // Compute centroid from first ring
+      const ring = rings[0];
+      let cx = 0, cy = 0;
+      for (const pt of ring) { cx += pt[0]; cy += pt[1]; }
+      cx /= ring.length; cy /= ring.length;
+
+      // Build address
+      let addr = attrs.siteadd || '';
+      if (!addr) {
+        const parts = [attrs.saddno, attrs.saddstname, attrs.saddsttyp].filter(Boolean);
+        addr = parts.join(' ');
+      }
+      if (!addr) addr = attrs.mailadd || '';
+      const city = attrs.scity || attrs.mcity || '';
+
+      features.push({
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: [cx, cy] },
+        properties: {
+          owner: attrs.ownname || 'Unknown',
+          address: addr,
+          city: city,
+          acres: attrs.gisacres || 0,
+          usedesc: attrs.parusedesc || '',
+          parno: attrs.parno || '',
+          county: attrs.cntyname || ''
+        }
+      });
+    }
+
+    console.log(`[gis-proxy] Farms: returning ${features.length} centroids`);
+    return geojsonResp({ type: 'FeatureCollection', features });
   } catch (err) {
     console.error('[gis-proxy] Farms query failed:', err.message);
     return json({ error: err.message }, 502);

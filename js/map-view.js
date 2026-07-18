@@ -357,32 +357,29 @@
     fetch(proxyUrl)
       .then(function(r) { return r.json(); })
       .then(function(data) {
-        if (!data.features) return;
+        if (!data.features) { console.warn('[NCSmall Map] No farm features'); return; }
         dynamicFarms = [];
         data.features.forEach(function(f) {
           var p = f.properties || {};
           var geom = f.geometry;
-          if (!geom) return;
+          if (!geom || !geom.coordinates) return;
           
-          // Calculate centroid from polygon
-          var lat = 0, lng = 0, count = 0;
-          var coords = geom.type === 'MultiPolygon' ? geom.coordinates[0][0] : 
-                       (geom.coordinates && geom.coordinates[0] ? geom.coordinates[0] : []);
-          coords.forEach(function(c) { lng += c[0]; lat += c[1]; count++; });
-          if (count === 0) return;
-          lat /= count; lng /= count;
+          // Centroids come as Point geometry from proxy
+          var lng = geom.coordinates[0];
+          var lat = geom.coordinates[1];
+          if (!lat || !lng) return;
           
-          var addr = p.address || p.siteadd || p.mailadd || '';
-          var city = p.scity || p.mcity || '';
-          if (addr && city) addr += ', ' + city;
+          var addr = p.address || '';
+          if (addr && p.city) addr += ', ' + p.city;
+          if (!addr) addr = (p.county || 'Guilford') + ' County';
           
           dynamicFarms.push({
-            name: p.owner || p.ownname || 'Unknown',
-            addr: addr || (p.cntyname || 'Guilford') + ' County',
+            name: p.owner || 'Unknown',
+            addr: addr,
             lat: lat, lng: lng,
-            acres: p.GISACRES || p.gisacres || 0,
-            type: p.usedesc || p.parusedesc || 'Farm',
-            pin: p.parcelnumb || p.parno || ''
+            acres: p.acres || 0,
+            type: p.usedesc || 'Farm',
+            pin: p.parno || ''
           });
         });
         
