@@ -13,6 +13,14 @@
   let isFetchingParcels = false;
   let totalRealParcelsInView = 0;
 
+  // Layer references for toggle controls
+  let satelliteLayer = null;
+  let labelsLayer = null;
+  let farmPinsLayer = null;
+  let parcelsVisible = true;
+  let labelsVisible = true;
+  let farmPinData = []; // cached farm centroids for wide-zoom pins
+
   /* ── Farm Classification from land use ────────────────────── */
   const FARM_CLASS = {
     'confirmed-farm':   { color: '#2E7D32', fill: 'rgba(46,125,50,0.18)',  label: 'Confirmed Farm' },
@@ -273,14 +281,20 @@
     );
   }
   function layerDot(label, icon, color, active) {
-    return h('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 2px', cursor: 'pointer' },
+    return h('div', { 'data-layer-name': label, style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 2px', cursor: 'pointer' },
       onclick: function(e) {
         var dot = e.currentTarget.querySelector('.ldot');
-        if (dot) {
-          var isOn = dot.style.background !== 'transparent';
-          dot.style.background = isOn ? 'transparent' : color;
-          dot.style.borderColor = isOn ? '#475569' : color;
-        }
+        var iconEl = e.currentTarget.querySelector('.material-icons-round');
+        var labelEl = e.currentTarget.querySelectorAll('span')[1];
+        if (!dot) return;
+        var isOn = dot.style.background !== 'transparent';
+        // Toggle visual
+        dot.style.background = isOn ? 'transparent' : color;
+        dot.style.borderColor = isOn ? '#475569' : color;
+        if (iconEl) iconEl.style.color = isOn ? '#475569' : color;
+        if (labelEl) labelEl.style.color = isOn ? '#64748b' : '#e2e8f0';
+        // Toggle actual layer
+        toggleLayer(label, !isOn);
       }
     },
       h('div', { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
@@ -291,6 +305,29 @@
     );
   }
 
+  function toggleLayer(name, show) {
+    if (!mapInstance) return;
+    switch(name) {
+      case 'Clean Satellite':
+        // Clean = no labels; toggle labels overlay
+        labelsVisible = !show;
+        if (show && labelsLayer) { mapInstance.removeLayer(labelsLayer); }
+        if (!show && labelsLayer) { labelsLayer.addTo(mapInstance); }
+        break;
+      case 'Parcels':
+        parcelsVisible = show;
+        if (show && realParcelLayer) { realParcelLayer.addTo(mapInstance); }
+        if (!show && realParcelLayer) { mapInstance.removeLayer(realParcelLayer); }
+        // Also toggle farm pins
+        if (show && farmPinsLayer) { farmPinsLayer.addTo(mapInstance); }
+        if (!show && farmPinsLayer) { mapInstance.removeLayer(farmPinsLayer); }
+        break;
+      default:
+        showToast(name + ' — coming soon', 'info');
+        break;
+    }
+  }
+
   /* ── Map Init ── */
   function initMap() {
     var container = document.getElementById('nc-farm-map');
@@ -299,11 +336,13 @@
 
     if (mapInstance) { try { mapInstance.remove(); } catch(e) {} mapInstance = null; }
 
-    mapInstance = L.map(container, { zoomControl: false, attributionControl: false }).setView([36.07, -79.79], 14);
+    mapInstance = L.map(container, { zoomControl: false, attributionControl: false }).setView([36.07, -79.79], 13);
     window._ncMapInstance = mapInstance;
 
-    L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { maxZoom: 21 }).addTo(mapInstance);
-    L.tileLayer('https://mt1.google.com/vt/lyrs=h&x={x}&y={y}&z={z}', { maxZoom: 21, opacity: 0.4 }).addTo(mapInstance);
+    // Store layer refs so toggles can control them
+    satelliteLayer = L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { maxZoom: 21 }).addTo(mapInstance);
+    labelsLayer = L.tileLayer('https://mt1.google.com/vt/lyrs=h&x={x}&y={y}&z={z}', { maxZoom: 21, opacity: 0.4 }).addTo(mapInstance);
+    farmPinsLayer = L.layerGroup().addTo(mapInstance);
 
     L.control.zoom({ position: 'bottomright' }).addTo(mapInstance);
     parcelPolygonGroup = L.layerGroup().addTo(mapInstance);
@@ -315,12 +354,43 @@
       fetchDebounceTimer = setTimeout(fetchRealParcels, 300);
     });
 
+    // Show/hide farm pins based on zoom
+    mapInstance.on('zoomend', function() {
+      updateFarmPinsVisibility();
+    });
+
     setTimeout(function() {
       if (mapInstance) {
         mapInstance.invalidateSize();
         fetchRealParcels(); 
       }
     }, 400);
+  }
+
+  // Farm pins: show at wide zoom, hide when parcels are visible
+  function updateFarmPinsVisibility() {
+    if (!mapInstance || !farmPinsLayer) return;
+    var zoom = mapInstance.getZoom();
+    if (zoom >= 14) {
+      // Parcels are detailed enough — hide pins
+      farmPinsLayer.clearLayers();
+    } else if (farmPinData.length > 0) {
+      // Show farm pins at wide zoom
+      farmPinsLayer.clearLayers();
+      farmPinData.forEach(function(fp) {
+        var pinColor = fp.cls === 'confirmed-farm' ? '#2E7D32' : (fp.cls === 'likely-farm' ? '#4CAF50' : '#FFC107');
+        var marker = L.marker([fp.lat, fp.lng], {
+          icon: L.divIcon({
+            className: 'farm-pin',
+            html: '<div style="background:' + pinColor + ';color:white;border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.4);font-size:12px;"><span class="material-icons-round" style="font-size:14px;">eco</span></div>',
+            iconSize: [24, 24],
+            iconAnchor: [12, 24]
+          })
+        });
+        marker.bindTooltip('<b>' + fp.landUse + '</b><br>' + fp.acres + ' ac', { direction: 'top', className: 'farm-tooltip' });
+        farmPinsLayer.addLayer(marker);
+      });
+    }
   }
 
   /* ── Address Geocoding (ArcGIS World Geocoder — free) ──── */
@@ -526,6 +596,24 @@
     }).addTo(mapInstance);
 
     updateClassCounts(classCounts, farmAcres);
+
+    // Build farm pin data for wide-zoom markers
+    farmPinData = [];
+    geojson.features.forEach(function(f) {
+      if (f._ncClass === 'non-agricultural') return;
+      var p = f.properties || {};
+      var landUse = p.usedesc || p.parusedesc || p.LAND_USE || p.parusecode || 'Farm';
+      var acres = p.GISACRES || p.gisacres || p.acres || p.CALCACRES || '0';
+      // Compute centroid from geometry
+      try {
+        var coords = f.geometry.coordinates;
+        var ring = f.geometry.type === 'MultiPolygon' ? coords[0][0] : coords[0];
+        var sumLat = 0, sumLng = 0, n = ring.length;
+        for (var i = 0; i < n; i++) { sumLng += ring[i][0]; sumLat += ring[i][1]; }
+        farmPinData.push({ lat: sumLat / n, lng: sumLng / n, cls: f._ncClass, landUse: landUse, acres: parseFloat(acres).toFixed(1) });
+      } catch(e) {}
+    });
+    updateFarmPinsVisibility();
   }
 
   function updateClassCounts(counts, farmAcres) {
