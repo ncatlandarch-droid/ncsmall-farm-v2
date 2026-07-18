@@ -31,7 +31,7 @@ export default async (request) => {
 
   // Parcels have their own 500-record cap; skip bbox limit for them.
   // Other GIS layers still need the bbox limit to avoid huge responses.
-  if (service !== 'parcels' && ((east - west) > MAX_BBOX_DEG || (north - south) > MAX_BBOX_DEG)) {
+  if (service !== 'parcels' && service !== 'farms' && ((east - west) > MAX_BBOX_DEG || (north - south) > MAX_BBOX_DEG)) {
     return json({ error: 'bbox_too_large', message: 'Zoom in to load GIS data' }, 400);
   }
 
