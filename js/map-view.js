@@ -61,6 +61,12 @@
       return 'potential-farm';
     }
 
+    // Potential: development-restricted or conservation land
+    if (lu.includes('DEVELOPMT') || lu.includes('RESTRICTED') || lu.includes('CONSERV') ||
+        lu.includes('EASEMENT') || lu.includes('PRESERVE') || lu.includes('WILDLIFE')) {
+      return 'potential-farm';
+    }
+
     // Potential: vacant/unimproved land with acreage
     if (ac >= 5 && (lu.includes('VACANT') || lu.includes('UNIMP') || lu.includes('UNDEVEL') ||
         lu.includes('OPEN') || lu.includes('WILD') || lu === '' || lu === 'UNKNOWN' ||
@@ -393,12 +399,9 @@
       + '&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects'
       + '&outFields=*&returnGeometry=true&outSR=4326&f=geojson&resultRecordCount=500';
 
+    // Use proxy only — direct county URLs don't resolve from browser (CORS)
     var urls = [
-      '/.netlify/functions/gis-proxy?service=parcels&bbox=' + w + ',' + s + ',' + e + ',' + n,
-      'https://maps.guilfordcountync.gov/arcgis/rest/services/BaseLayers/Parcels/MapServer/0/query?' + arcgisParams,
-      'https://maps.guilfordcountync.gov/arcgis/rest/services/Parcels/MapServer/0/query?' + arcgisParams,
-      'https://gis.guilfordcountync.gov/arcgis/rest/services/Parcels/FeatureServer/0/query?' + arcgisParams,
-      'https://services.nconemap.gov/secure/rest/services/NC1Map_Parcels/FeatureServer/1/query?' + arcgisParams
+      '/.netlify/functions/gis-proxy?service=parcels&bbox=' + w + ',' + s + ',' + e + ',' + n
     ];
 
     tryFetchParcels(urls, 0);

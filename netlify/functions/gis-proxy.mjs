@@ -9,7 +9,7 @@ const CORS = {
   'Cache-Control': 'public, max-age=300'
 };
 
-const MAX_BBOX_DEG = 0.12;
+const MAX_BBOX_DEG = 0.20;
 
 export default async (request) => {
   if (request.method === 'OPTIONS') {
