@@ -870,3 +870,18 @@ ul, ol { list-style: none; }
     padding: 4px 10px;
   }
 }
+
+/* ── GIS Layer Tooltips ── */
+.gis-layer-tooltip {
+  background: rgba(10, 14, 23, 0.92) !important;
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.1) !important;
+  border-radius: 8px !important;
+  padding: 6px 10px !important;
+  color: #f8fafc !important;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.4) !important;
+  font-family: Inter, sans-serif;
+}
+.gis-layer-tooltip::before {
+  border-top-color: rgba(10, 14, 23, 0.92) !important;
+}
