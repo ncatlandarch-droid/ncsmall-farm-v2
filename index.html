@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>ncsmall.farm | NC Cooperative Extension Digital Navigator</title>
+  <meta name="description" content="NC Cooperative Extension Digital Navigator — AI-powered farm assessment with real GIS data, conservation planning, and community resources. Powered by NC A&T State University's Small Farm Research and Innovation Center.">
+  <meta name="keywords" content="NC Cooperative Extension, small farm, NC A&T, USDA, NRCS, EQIP, conservation planning, agriculture, digital twin, GIS, SITES v2">
+  <meta name="author" content="NC A&T State University Small Farm Research and Innovation Center">
+  <meta name="theme-color" content="#004684">
+
+  <!-- Open Graph -->
+  <meta property="og:title" content="ncsmall.farm | NC Cooperative Extension Digital Navigator">
+  <meta property="og:description" content="AI-powered digital navigator with real GIS farm assessments from NC Cooperative Extension.">
+  <meta property="og:type" content="website">
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+
+  <!-- Leaflet (lightweight 2D map for community mode) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+
+  <!-- Application CSS -->
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body data-mode="community">
+
+  <div id="app"></div>
+
+  <!-- External Libraries -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- Firebase Compat SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
+  <!-- API key from localStorage — NEVER hardcode -->
+  <script>window.GEMINI_API_KEY = localStorage.getItem('gemini_api_key') || '';</script>
+
+  <!-- Core Modules (always loaded) -->
+  <script src="js/app.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/i18n.js"></script>
+  <script src="js/tts.js"></script>
+  <script src="js/avatars.js"></script>
+  <script src="js/demo-parcels.js"></script>
+
+  <!-- View Modules -->
+  <script src="js/header.js"></script>
+  <script src="js/onboarding.js"></script>
+  <script src="js/chat.js"></script>
+  <script src="js/map-view.js"></script>
+  <script src="js/farm-assessment.js"></script>
+  <script src="js/calendar.js"></script>
+  <script src="js/pages.js"></script>
+  <script src="js/esp-dashboard.js"></script>
+
+  <!-- CesiumJS loaded lazily via js/app.js when professional mode activates -->
+</body>
+</html>
