@@ -419,7 +419,7 @@
           + '<button onclick="window.openIntakeForm(\'' + pin + '\', \'' + safeOwner + '\', \'' + safeAddr + '\', \'' + acres + '\')" style="width:100%;padding:10px;background:#3B7A57;color:white;border:none;border-radius:8px;font-weight:800;font-size:12px;cursor:pointer;font-family:Inter,sans-serif;box-shadow:0 4px 12px rgba(59,122,87,0.3);">🌱 This Is My Farm — Start Assessment</button>'
           + '</div>';
           
-        layer.bindPopup(popupContent, { maxWidth: 320 });
+        layer.bindPopup(popupContent, { maxWidth: 320, autoPan: true, autoPanPadding: [40, 80] });
 
         layer.on('popupopen', function() {
            if (pin) fetchEnrichedTaxData(pin, acres, landUse);
