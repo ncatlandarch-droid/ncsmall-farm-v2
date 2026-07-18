@@ -32,16 +32,13 @@
   function classifyParcel(landUse, acres, useCode) {
     var lu = (landUse || '').toUpperCase().trim();
     var code = (useCode || '').toUpperCase().trim();
-    var ac = parseFloat(acres) || 0;
+    var numCode = parseInt(code) || parseInt(lu);
 
     // ── NC Property Tax Use Codes (numeric) ──────────────────
     // 600-699 = Agricultural, 700-799 = Forest/Timber
-    var numCode = parseInt(code) || parseInt(lu);
     if (numCode >= 600 && numCode < 800) return 'confirmed-farm';
-    if (numCode >= 500 && numCode < 600 && ac >= 5) return 'likely-farm'; // Exempt/special use
 
-    // ── Text-based classification ────────────────────────────
-    // Confirmed: explicitly agricultural
+    // ── Text-based: explicitly agricultural ──────────────────
     if (lu.includes('AGRI') || lu.includes('FARM') || lu.includes('CROP') ||
         lu.includes('DAIRY') || lu.includes('LIVESTOCK') || lu.includes('ORCHARD') ||
         lu.includes('TIMBER') || lu.includes('FOREST') || lu.includes('HORTI') ||
@@ -56,40 +53,11 @@
       return 'confirmed-farm';
     }
 
-    // Likely: rural/agricultural zoning with land
-    if ((lu.includes('RURAL') || lu.includes('R-A') || lu.includes('AG ') ||
-         lu === 'AG' || lu.startsWith('AG-') || lu.includes('ESTATE') ||
-         code.includes('RURAL') || code.includes('AG')) && ac >= 3) {
+    // ── Likely: rural/agricultural zoning ─────────────────────
+    if (lu.includes('RURAL') || lu.includes('R-A') || lu.includes('AG ') ||
+        lu === 'AG' || lu.startsWith('AG-') ||
+        code.includes('RURAL') || code.includes('AG')) {
       return 'likely-farm';
-    }
-
-    // Potential: large residential (could be farmed)
-    if (ac >= 10 && (lu.includes('RESID') || lu.includes('SINGLE') || 
-        lu.includes('DWELLING') || lu.includes('HOUSE') || numCode >= 100 && numCode < 200)) {
-      return 'potential-farm';
-    }
-
-    // Potential: conservation/wildlife land
-    if (lu.includes('CONSERV') || lu.includes('EASEMENT') || lu.includes('PRESERVE') || 
-        lu.includes('WILDLIFE')) {
-      return 'potential-farm';
-    }
-
-    // Potential: vacant/unimproved land with acreage
-    if (ac >= 5 && (lu.includes('VACANT') || lu.includes('UNIMP') || lu.includes('UNDEVEL') ||
-        lu.includes('OPEN') || lu.includes('WILD') || lu === '' || lu === 'UNKNOWN' ||
-        numCode >= 800 && numCode < 900)) {
-      return 'potential-farm';
-    }
-
-    // Potential: large unclassified parcels — but NOT industrial/commercial/govt
-    if (ac >= 20 && !lu.includes('IND') && !lu.includes('COMM') && !lu.includes('OFFIC') &&
-        !lu.includes('RETAIL') && !lu.includes('WAREHOUSE') && !lu.includes('MANUFACT') &&
-        !lu.includes('UTIL') && !lu.includes('GOVT') && !lu.includes('EXEMPT') &&
-        !lu.includes('CHURCH') && !lu.includes('SCHOOL') && !lu.includes('HOSPITAL') &&
-        !lu.includes('AIRPORT') && !lu.includes('RAIL') && !lu.includes('MINING') &&
-        !lu.includes('CONDO') && !lu.includes('COMMON') && !lu.includes('MULTI')) {
-      return 'potential-farm';
     }
 
     return 'non-agricultural';
