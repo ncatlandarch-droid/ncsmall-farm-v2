@@ -38,6 +38,7 @@ export default async (request) => {
   try {
     switch (service) {
       case 'parcels':  return await fetchParcels(west, south, east, north);
+      case 'farms':    return await fetchFarms(west, south, east, north);
       case 'contours': return await fetchContours(west, south, east, north);
       case 'soils':      return await fetchSoils(west, south, east, north);
       case 'zoning':     return await fetchZoning(west, south, east, north);
@@ -144,6 +145,80 @@ function _normalizeNCOneMap(fc) {
     // If nothing found, p.address stays undefined — client shows county/PIN
   });
   return fc;
+}
+
+// ---------------------------------------------------------------------------
+// Farm-specific query — fetches ONLY farm/agriculture parcels from NC OneMap
+// Uses WHERE clause to filter by land use, covering the entire bbox area.
+// Returns up to 2000 farm parcels per request.
+// ---------------------------------------------------------------------------
+async function fetchFarms(w, s, e, n) {
+  const farmWhere = [
+    "parusedesc LIKE '%AGRI%'",
+    "parusedesc LIKE '%FARM%'",
+    "parusedesc LIKE '%CROP%'",
+    "parusedesc LIKE '%DAIRY%'",
+    "parusedesc LIKE '%LIVESTOCK%'",
+    "parusedesc LIKE '%FOREST%'",
+    "parusedesc LIKE '%TIMBER%'",
+    "parusedesc LIKE '%HORTI%'",
+    "parusedesc LIKE '%NURSERY%'",
+    "parusedesc LIKE '%POULTRY%'",
+    "parusedesc LIKE '%PASTURE%'",
+    "parusedesc LIKE '%ORCHARD%'",
+    "parusedesc LIKE '%RANCH%'",
+    "parusedesc LIKE '%VINEYARD%'",
+    "parusedesc LIKE '%TOBACCO%'",
+    "parusedesc LIKE '%HAY%'",
+    "parusedesc LIKE '%EQUINE%'",
+    "parusedesc LIKE '%CATTLE%'",
+    "parusedesc LIKE '%SWINE%'",
+    "parusedesc LIKE '%AQUA%'",
+    "parusedesc LIKE '%COTTON%'",
+    "parusedesc LIKE '%GOAT%'",
+    "parusedesc LIKE '%SOD%'",
+    "parusedesc LIKE '%CONSERV%'",
+    "parusedesc LIKE '%DEVELOPMT%'"
+  ].join(' OR ');
+
+  const params = new URLSearchParams({
+    where:          farmWhere,
+    geometry:       `${w},${s},${e},${n}`,
+    geometryType:   'esriGeometryEnvelope',
+    inSR:           '4326',
+    spatialRel:     'esriSpatialRelIntersects',
+    outFields:      'parno,ownname,siteadd,saddno,saddpref,saddstname,saddsttyp,saddstsuf,scity,mailadd,mcity,gisacres,parusedesc,parusecode,cntyname,parval,improvval,landval',
+    returnGeometry: 'true',
+    outSR:          '4326',
+    f:              'geojson',
+    resultRecordCount: '2000',
+  });
+
+  const ncOneMapUrl = 'https://services.nconemap.gov/secure/rest/services/NC1Map_Parcels/FeatureServer/1/query';
+
+  try {
+    const resp = await fetch(`${ncOneMapUrl}?${params}`);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const data = await resp.json();
+    
+    if (data.error) throw new Error(data.error.message || 'ArcGIS error');
+    
+    // Convert to GeoJSON if needed
+    let fc = data;
+    if (data.features && !data.type) {
+      fc = { type: 'FeatureCollection', features: data.features };
+    }
+    
+    console.log(`[gis-proxy] Farms query returned ${fc.features?.length || 0} farm parcels`);
+    
+    // Normalize field names
+    _normalizeNCOneMap(fc);
+    
+    return geojsonResp(fc);
+  } catch (err) {
+    console.error('[gis-proxy] Farms query failed:', err.message);
+    return json({ error: err.message }, 502);
+  }
 }
 
 async function fetchParcels(w, s, e, n) {

@@ -69,9 +69,9 @@
       return 'potential-farm';
     }
 
-    // Potential: conservation/wildlife land (genuinely farm-adjacent)
-    if ((lu.includes('CONSERV') || lu.includes('EASEMENT') || lu.includes('PRESERVE') || 
-        lu.includes('WILDLIFE')) && ac >= 3) {
+    // Potential: conservation/development-restricted/wildlife land
+    if (lu.includes('CONSERV') || lu.includes('EASEMENT') || lu.includes('PRESERVE') || 
+        lu.includes('WILDLIFE') || lu.includes('DEVELOPMT') || lu.includes('RESTRICTED')) {
       return 'potential-farm';
     }
 
@@ -362,32 +362,122 @@
     setTimeout(function() {
       if (mapInstance) {
         mapInstance.invalidateSize();
-        fetchRealParcels(); 
+        fetchRealParcels();
+        fetchDynamicFarms(); // Load farm pins from NC OneMap
       }
     }, 400);
   }
 
   // Farm pins: show at wide zoom, hide when parcels are visible
+  var knownFarmPinsAdded = false;
+  var dynamicFarms = []; // populated from proxy farm query
+
+  // Fetch farm parcels from NC OneMap via proxy — covers entire visible area
+  function fetchDynamicFarms() {
+    if (!mapInstance) return;
+    // Use a wide bbox covering Guilford County area
+    var bbox = '-80.1,35.9,-79.5,36.25';
+    var proxyUrl = '/.netlify/functions/gis-proxy?service=farms&bbox=' + bbox;
+    
+    fetch(proxyUrl)
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (!data.features) return;
+        dynamicFarms = [];
+        data.features.forEach(function(f) {
+          var p = f.properties || {};
+          var geom = f.geometry;
+          if (!geom) return;
+          
+          // Calculate centroid from polygon
+          var lat = 0, lng = 0, count = 0;
+          var coords = geom.type === 'MultiPolygon' ? geom.coordinates[0][0] : 
+                       (geom.coordinates && geom.coordinates[0] ? geom.coordinates[0] : []);
+          coords.forEach(function(c) { lng += c[0]; lat += c[1]; count++; });
+          if (count === 0) return;
+          lat /= count; lng /= count;
+          
+          var addr = p.address || p.siteadd || p.mailadd || '';
+          var city = p.scity || p.mcity || '';
+          if (addr && city) addr += ', ' + city;
+          
+          dynamicFarms.push({
+            name: p.owner || p.ownname || 'Unknown',
+            addr: addr || (p.cntyname || 'Guilford') + ' County',
+            lat: lat, lng: lng,
+            acres: p.GISACRES || p.gisacres || 0,
+            type: p.usedesc || p.parusedesc || 'Farm',
+            pin: p.parcelnumb || p.parno || ''
+          });
+        });
+        
+        console.log('[NCSmall Map] Dynamic farms loaded: ' + dynamicFarms.length);
+        showToast(dynamicFarms.length + ' farms found in Guilford County area', 'success');
+        updateFarmPinsVisibility();
+        
+        // Update bottom status
+        var el = document.getElementById('real-parcel-count-label');
+        if (el) el.innerText = 'Farms Found: ' + dynamicFarms.length;
+      })
+      .catch(function(err) {
+        console.warn('[NCSmall Map] Farm discovery failed:', err.message);
+      });
+  }
+
   function updateFarmPinsVisibility() {
     if (!mapInstance || !farmPinsLayer) return;
     var zoom = mapInstance.getZoom();
-    if (zoom >= 14) {
-      // Parcels are detailed enough — hide pins
-      farmPinsLayer.clearLayers();
-    } else if (farmPinData.length > 0) {
-      // Show farm pins at wide zoom
-      farmPinsLayer.clearLayers();
-      farmPinData.forEach(function(fp) {
-        var pinColor = fp.cls === 'confirmed-farm' ? '#2E7D32' : (fp.cls === 'likely-farm' ? '#4CAF50' : '#FFC107');
-        var marker = L.marker([fp.lat, fp.lng], {
+    farmPinsLayer.clearLayers();
+
+    // Show dynamic farm pins from NC OneMap query (always visible)
+    dynamicFarms.forEach(function(farm) {
+      var marker = L.marker([farm.lat, farm.lng], {
+        icon: L.divIcon({
+          className: 'known-farm-pin',
+          html: '<div style="background:#2E7D32;color:white;border-radius:50%;width:' + (zoom >= 14 ? '12' : '24') + 'px;height:' + (zoom >= 14 ? '12' : '24') + 'px;display:flex;align-items:center;justify-content:center;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.5);font-size:12px;cursor:pointer;">'
+            + (zoom < 14 ? '<span class="material-icons-round" style="font-size:14px;">eco</span>' : '')
+            + '</div>',
+          iconSize: zoom >= 14 ? [12, 12] : [24, 24],
+          iconAnchor: zoom >= 14 ? [6, 6] : [12, 24]
+        })
+      });
+      var acStr = farm.acres ? parseFloat(farm.acres).toFixed(1) + ' ac' : '';
+      var tip = '<div style="font-family:Inter,sans-serif;min-width:180px;">'
+        + '<div style="font-weight:900;font-size:13px;color:#2E7D32;">' + farm.name + '</div>'
+        + '<div style="font-size:10px;color:#64748b;margin:2px 0;">' + farm.addr + '</div>'
+        + '<div style="font-size:10px;font-weight:600;color:#4CAF50;">' + farm.type + (acStr ? ' · ' + acStr : '') + '</div>'
+        + (farm.pin ? '<div style="font-size:9px;color:#94a3b8;">PIN: ' + farm.pin + '</div>' : '')
+        + '</div>';
+      marker.bindTooltip(tip, { direction: 'top', className: 'farm-tooltip', offset: [0, -10] });
+      marker.on('click', function() {
+        mapInstance.setView([farm.lat, farm.lng], 16);
+      });
+      farmPinsLayer.addLayer(marker);
+    });
+
+    // Also show known farms from static list (if loaded)
+    if (window.KNOWN_FARMS) {
+      window.KNOWN_FARMS.forEach(function(farm) {
+        var marker = L.marker([farm.lat, farm.lng], {
           icon: L.divIcon({
-            className: 'farm-pin',
-            html: '<div style="background:' + pinColor + ';color:white;border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.4);font-size:12px;"><span class="material-icons-round" style="font-size:14px;">eco</span></div>',
-            iconSize: [24, 24],
-            iconAnchor: [12, 24]
+            className: 'known-farm-pin-star',
+            html: '<div style="background:#FDB927;color:#1a1a2e;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.5);font-size:14px;cursor:pointer;"><span class="material-icons-round" style="font-size:16px;">star</span></div>',
+            iconSize: [28, 28],
+            iconAnchor: [14, 28]
           })
         });
-        marker.bindTooltip('<b>' + fp.landUse + '</b><br>' + fp.acres + ' ac', { direction: 'top', className: 'farm-tooltip' });
+        var stars = '';
+        for (var s = 0; s < 5; s++) stars += s < Math.round(farm.rating) ? '★' : '☆';
+        var tip = '<div style="font-family:Inter,sans-serif;min-width:180px;">'
+          + '<div style="font-weight:900;font-size:13px;color:#FDB927;">⭐ ' + farm.name + '</div>'
+          + '<div style="font-size:10px;color:#64748b;margin:2px 0;">' + farm.addr + '</div>'
+          + '<div style="font-size:10px;color:#FDB927;">' + stars + ' <span style="color:#94a3b8;">' + farm.rating + '</span></div>'
+          + '<div style="font-size:10px;font-weight:600;color:#4CAF50;margin-top:2px;">' + farm.type + '</div>'
+          + '</div>';
+        marker.bindTooltip(tip, { direction: 'top', className: 'farm-tooltip', offset: [0, -10] });
+        marker.on('click', function() {
+          mapInstance.setView([farm.lat, farm.lng], 16);
+        });
         farmPinsLayer.addLayer(marker);
       });
     }
