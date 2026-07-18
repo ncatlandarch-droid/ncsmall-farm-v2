@@ -308,61 +308,92 @@
     isFetchingParcels = true;
     showToast('Loading parcels...', 'info');
 
-    fetch('/.netlify/functions/gis-proxy?service=parcels&bbox=' + bbox)
+    // Build ArcGIS query params for direct calls
+    var w = bounds.getWest().toFixed(6);
+    var s = bounds.getSouth().toFixed(6);
+    var e = bounds.getEast().toFixed(6);
+    var n = bounds.getNorth().toFixed(6);
+
+    var arcgisParams = 'where=1%3D1&geometry=' + w + ',' + s + ',' + e + ',' + n
+      + '&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects'
+      + '&outFields=*&returnGeometry=true&outSR=4326&f=geojson&resultRecordCount=500';
+
+    // Cascade: Netlify proxy → Guilford County direct → NC OneMap direct
+    var urls = [
+      '/.netlify/functions/gis-proxy?service=parcels&bbox=' + w + ',' + s + ',' + e + ',' + n,
+      'https://maps.guilfordcountync.gov/arcgis/rest/services/BaseLayers/Parcels/MapServer/0/query?' + arcgisParams,
+      'https://maps.guilfordcountync.gov/arcgis/rest/services/Parcels/MapServer/0/query?' + arcgisParams,
+      'https://gis.guilfordcountync.gov/arcgis/rest/services/Parcels/FeatureServer/0/query?' + arcgisParams,
+      'https://services.nconemap.gov/secure/rest/services/NC1Map_Parcels/FeatureServer/1/query?' + arcgisParams
+    ];
+
+    tryFetchParcels(urls, 0);
+  }
+
+  function tryFetchParcels(urls, idx) {
+    if (idx >= urls.length) {
+      isFetchingParcels = false;
+      showToast('All parcel sources unavailable', 'warn');
+      return;
+    }
+
+    fetch(urls[idx], { signal: AbortSignal.timeout ? AbortSignal.timeout(8000) : undefined })
       .then(function(resp) {
         if (!resp.ok) throw new Error('HTTP ' + resp.status);
         return resp.json();
       })
       .then(function(geojson) {
-        if (realParcelLayer) { mapInstance.removeLayer(realParcelLayer); }
         if (!geojson || !geojson.features || !geojson.features.length) {
-          showToast('No parcels in this area', 'info');
-          return;
+          throw new Error('empty');
         }
-        realParcelLayer = L.geoJSON(geojson, {
-          style: {
-            color: '#FDB927',
-            weight: 2,
-            fillColor: 'rgba(253,185,39,0.08)',
-            fillOpacity: 0.08,
-            opacity: 0.9
-          },
-          onEachFeature: function(feature, layer) {
-            var p = feature.properties || {};
-            var owner = p.owner || p.ownname || p.OWNER_NAME || p.OWNER || 'Unknown';
-            var addr = p.mailadd || p.siteadd || p.SITUS_ADDRESS || p.SITE_ADDR || '';
-            var acres = p.GISACRES || p.gisacres || p.acres || '';
-            var landUse = p.usedesc || p.parusedesc || p.LAND_USE || '';
-            var pin = p.parcelnumb || p.parno || p.PARCEL_ID || p.PIN || '';
-
-            var popup = '<div style="min-width:220px;font-family:Inter,sans-serif;padding:4px;">'
-              + '<div style="font-weight:900;color:#004684;font-size:14px;margin-bottom:2px;">' + owner + '</div>'
-              + (addr ? '<div style="font-size:11px;color:#94a3b8;margin-bottom:6px;">' + addr + '</div>' : '')
-              + (pin ? '<div style="font-size:10px;color:#64748b;margin-bottom:6px;">PIN: ' + pin + '</div>' : '')
-              + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:6px;">'
-              + (acres ? '<div><div style="font-size:9px;color:#94a3b8;text-transform:uppercase;">Acreage</div><div style="font-weight:800;font-size:14px;">' + parseFloat(acres).toFixed(2) + ' ac</div></div>' : '')
-              + (landUse ? '<div><div style="font-size:9px;color:#94a3b8;text-transform:uppercase;">Land Use</div><div style="font-size:11px;font-weight:600;">' + landUse + '</div></div>' : '')
-              + '</div>'
-              + '</div>';
-            layer.bindPopup(popup, { maxWidth: 280 });
-
-            // Highlight on hover
-            layer.on('mouseover', function() {
-              this.setStyle({ weight: 4, fillOpacity: 0.25, color: '#FFD700' });
-            });
-            layer.on('mouseout', function() {
-              this.setStyle({ weight: 2, fillOpacity: 0.08, color: '#FDB927' });
-            });
-          }
-        }).addTo(mapInstance);
-
-        showToast(geojson.features.length + ' parcels loaded', 'success');
+        renderParcelGeoJSON(geojson);
+        var src = idx === 0 ? 'proxy' : (urls[idx].includes('guilford') ? 'Guilford County GIS' : 'NC OneMap');
+        showToast(geojson.features.length + ' parcels loaded (' + src + ')', 'success');
+        isFetchingParcels = false;
       })
       .catch(function(err) {
-        console.warn('[NCSmall Map] Parcel fetch failed:', err.message);
-        showToast('Parcel data unavailable — try again', 'warn');
-      })
-      .finally(function() { isFetchingParcels = false; });
+        console.warn('[NCSmall Map] Source ' + idx + ' failed:', err.message, urls[idx].substring(0, 60));
+        tryFetchParcels(urls, idx + 1);
+      });
+  }
+
+  function renderParcelGeoJSON(geojson) {
+    if (realParcelLayer) { mapInstance.removeLayer(realParcelLayer); }
+    realParcelLayer = L.geoJSON(geojson, {
+      style: {
+        color: '#FDB927',
+        weight: 2,
+        fillColor: 'rgba(253,185,39,0.08)',
+        fillOpacity: 0.08,
+        opacity: 0.9
+      },
+      onEachFeature: function(feature, layer) {
+        var p = feature.properties || {};
+        var owner = p.owner || p.ownname || p.OWNER_NAME || p.OWNER || p.OWNERNM || 'Unknown';
+        var addr = p.mailadd || p.siteadd || p.SITUS_ADDRESS || p.SITE_ADDR || p.sadd || '';
+        var acres = p.GISACRES || p.gisacres || p.acres || p.CALCACRES || '';
+        var landUse = p.usedesc || p.parusedesc || p.LAND_USE || p.parusecode || '';
+        var pin = p.parcelnumb || p.parno || p.PARCEL_ID || p.PIN || p.PARID || '';
+
+        var popup = '<div style="min-width:220px;font-family:Inter,sans-serif;padding:4px;">'
+          + '<div style="font-weight:900;color:#004684;font-size:14px;margin-bottom:2px;">' + owner + '</div>'
+          + (addr ? '<div style="font-size:11px;color:#94a3b8;margin-bottom:6px;">' + addr + '</div>' : '')
+          + (pin ? '<div style="font-size:10px;color:#64748b;margin-bottom:6px;">PIN: ' + pin + '</div>' : '')
+          + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:6px;">'
+          + (acres ? '<div><div style="font-size:9px;color:#94a3b8;text-transform:uppercase;">Acreage</div><div style="font-weight:800;font-size:14px;">' + parseFloat(acres).toFixed(2) + ' ac</div></div>' : '')
+          + (landUse ? '<div><div style="font-size:9px;color:#94a3b8;text-transform:uppercase;">Land Use</div><div style="font-size:11px;font-weight:600;">' + landUse + '</div></div>' : '')
+          + '</div>'
+          + '</div>';
+        layer.bindPopup(popup, { maxWidth: 280 });
+
+        layer.on('mouseover', function() {
+          this.setStyle({ weight: 4, fillOpacity: 0.25, color: '#FFD700' });
+        });
+        layer.on('mouseout', function() {
+          this.setStyle({ weight: 2, fillOpacity: 0.08, color: '#FDB927' });
+        });
+      }
+    }).addTo(mapInstance);
   }
 
   /* ── Toast notification ──────────────────────────────────── */
