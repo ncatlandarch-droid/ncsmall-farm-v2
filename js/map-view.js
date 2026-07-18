@@ -383,13 +383,19 @@
           });
         });
         
-        console.log('[NCSmall Map] Dynamic farms loaded: ' + dynamicFarms.length);
-        showToast(dynamicFarms.length + ' farms found in Guilford County area', 'success');
+        // Calculate total acreage
+        var totalAcres = 0;
+        dynamicFarms.forEach(function(f) { totalAcres += parseFloat(f.acres) || 0; });
+        
+        console.log('[NCSmall Map] Dynamic farms loaded: ' + dynamicFarms.length + ' (' + Math.round(totalAcres).toLocaleString() + ' acres)');
+        showToast(dynamicFarms.length + ' farms · ' + Math.round(totalAcres).toLocaleString() + ' acres in region', 'success');
         updateFarmPinsVisibility();
         
-        // Update bottom status
+        // Update bottom status with TOTAL farm data
         var el = document.getElementById('real-parcel-count-label');
-        if (el) el.innerText = 'Farms Found: ' + dynamicFarms.length;
+        if (el) {
+          el.innerHTML = 'Farm Parcels: <b style="color:#4CAF50">' + dynamicFarms.length.toLocaleString() + '</b> · Total Acreage: <b style="color:#4CAF50">' + Math.round(totalAcres).toLocaleString() + ' ac</b>';
+        }
       })
       .catch(function(err) {
         console.warn('[NCSmall Map] Farm discovery failed:', err.message);
