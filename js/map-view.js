@@ -337,11 +337,26 @@
     );
   }
 
+  // GIS Layer cache + references
+  var gisLayers = {};  // name → L.geoJSON layer
+  var gisLayerCache = {}; // name → geojson data
+  var gisLayerLoading = {}; // name → boolean
+
+  // Layer config: maps UI name → proxy service + styling
+  var GIS_LAYER_CONFIG = {
+    'Soils (SSURGO)':        { service: 'soils',      color: '#4CAF50', fillOpacity: 0.25, weight: 1 },
+    'Zoning':                { service: 'zoning',     color: '#AB47BC', fillOpacity: 0.20, weight: 1.5 },
+    'Overlay Districts':     { service: 'overlay',    color: '#5C6BC0', fillOpacity: 0.18, weight: 1.5 },
+    'Future Land Use':       { service: 'futurelu',   color: '#F57F17', fillOpacity: 0.22, weight: 1 },
+    'Water Bodies & Streams':{ service: 'hydrology',  color: '#1E88E5', fillOpacity: 0.35, weight: 2 },
+    'Flood Zones':           { service: 'floodplain', color: '#2196F3', fillOpacity: 0.25, weight: 1.5 },
+    'Wetlands (NWI)':        { service: 'wetlands',   color: '#00897B', fillOpacity: 0.30, weight: 1 }
+  };
+
   function toggleLayer(name, show) {
     if (!mapInstance) return;
     switch(name) {
       case 'Clean Satellite':
-        // Clean = no labels; toggle labels overlay
         labelsVisible = !show;
         if (show && labelsLayer) { mapInstance.removeLayer(labelsLayer); }
         if (!show && labelsLayer) { labelsLayer.addTo(mapInstance); }
@@ -350,14 +365,126 @@
         parcelsVisible = show;
         if (show && realParcelLayer) { realParcelLayer.addTo(mapInstance); }
         if (!show && realParcelLayer) { mapInstance.removeLayer(realParcelLayer); }
-        // Also toggle farm pins
         if (show && farmPinsLayer) { farmPinsLayer.addTo(mapInstance); }
         if (!show && farmPinsLayer) { mapInstance.removeLayer(farmPinsLayer); }
         break;
       default:
-        showToast(name + ' — coming soon', 'info');
+        // Check if it's a real GIS layer
+        if (GIS_LAYER_CONFIG[name]) {
+          toggleGISLayer(name, show);
+        } else {
+          showToast(name + ' — coming soon', 'info');
+        }
         break;
     }
+  }
+
+  function toggleGISLayer(name, show) {
+    var config = GIS_LAYER_CONFIG[name];
+    if (!config) return;
+
+    // If hiding, just remove
+    if (!show) {
+      if (gisLayers[name]) {
+        mapInstance.removeLayer(gisLayers[name]);
+      }
+      return;
+    }
+
+    // If already loaded, just add back
+    if (gisLayers[name]) {
+      gisLayers[name].addTo(mapInstance);
+      return;
+    }
+
+    // If already loading, skip
+    if (gisLayerLoading[name]) return;
+
+    // Fetch from proxy
+    gisLayerLoading[name] = true;
+    showToast('Loading ' + name + '...', 'info');
+
+    var bounds = mapInstance.getBounds();
+    var bbox = bounds.getWest().toFixed(6) + ',' + bounds.getSouth().toFixed(6) + ',' + bounds.getEast().toFixed(6) + ',' + bounds.getNorth().toFixed(6);
+
+    fetch('/.netlify/functions/gis-proxy?service=' + config.service + '&bbox=' + bbox)
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        gisLayerLoading[name] = false;
+        if (data.error) {
+          showToast(name + ': ' + (data.message || data.error), 'warn');
+          return;
+        }
+        if (!data.features || data.features.length === 0) {
+          showToast(name + ': No data in view — try zooming in', 'warn');
+          return;
+        }
+
+        gisLayerCache[name] = data;
+
+        // Build label field for tooltips
+        gisLayers[name] = L.geoJSON(data, {
+          style: function(feature) {
+            return {
+              color: config.color,
+              weight: config.weight,
+              fillColor: config.color,
+              fillOpacity: config.fillOpacity,
+              opacity: 0.7
+            };
+          },
+          onEachFeature: function(feature, layer) {
+            var p = feature.properties || {};
+            var label = buildLayerTooltip(name, p);
+            if (label) {
+              layer.bindTooltip(label, { sticky: true, className: 'gis-layer-tooltip', direction: 'top' });
+            }
+          }
+        }).addTo(mapInstance);
+
+        showToast(name + ': ' + data.features.length + ' features loaded', 'success');
+      })
+      .catch(function(err) {
+        gisLayerLoading[name] = false;
+        showToast(name + ' failed — ' + err.message, 'warn');
+      });
+  }
+
+  // Build tooltip HTML based on layer type
+  function buildLayerTooltip(layerName, p) {
+    var html = '<div style="font-family:Inter,sans-serif;min-width:140px;font-size:11px;">';
+    switch(layerName) {
+      case 'Soils (SSURGO)':
+        html += '<b style="color:#4CAF50;">' + (p.musym || p.MUSYM || p.muname || 'Soil Unit') + '</b>';
+        if (p.muname || p.MUNAME) html += '<br>' + (p.muname || p.MUNAME);
+        break;
+      case 'Zoning':
+        html += '<b style="color:#AB47BC;">' + (p.ZONE_DESC || p.ZONING || p.zone || p.Zone || p.ZONE || p.zonedesc || 'Zone') + '</b>';
+        if (p.ZONE_CODE || p.ZONECODE || p.zonecode) html += '<br>Code: ' + (p.ZONE_CODE || p.ZONECODE || p.zonecode);
+        break;
+      case 'Overlay Districts':
+        html += '<b style="color:#5C6BC0;">' + (p.NAME || p.DIST_NAME || p.OVERLAY || p.name || 'Overlay') + '</b>';
+        break;
+      case 'Future Land Use':
+        html += '<b style="color:#F57F17;">' + (p.CATEGORY || p.FLU || p.LANDUSE || p.NAME || p.name || 'Future LU') + '</b>';
+        break;
+      case 'Water Bodies & Streams':
+        html += '<b style="color:#1E88E5;">' + (p.GNIS_NAME || p.NAME || p.name || p.FTYPE || p.ftype || 'Water') + '</b>';
+        if (p.FCODE_DESC || p.FTYPE) html += '<br>' + (p.FCODE_DESC || p.FTYPE);
+        break;
+      case 'Flood Zones':
+        html += '<b style="color:#2196F3;">Zone ' + (p.FLD_ZONE || p.ZONE || p.zone || 'N/A') + '</b>';
+        if (p.ZONE_SUBTY || p.SFHA_TF) html += '<br>' + (p.ZONE_SUBTY || (p.SFHA_TF === 'T' ? 'Special Flood Hazard' : ''));
+        break;
+      case 'Wetlands (NWI)':
+        html += '<b style="color:#00897B;">' + (p.WETLAND_TYPE || p.ATTRIBUTE || p.attribute || 'Wetland') + '</b>';
+        if (p.ACRES || p.Shape_Area) html += '<br>' + parseFloat(p.ACRES || (p.Shape_Area * 0.000247105)).toFixed(1) + ' ac';
+        break;
+      default:
+        html += '<b>' + JSON.stringify(p).substring(0, 100) + '</b>';
+    }
+    html += '</div>';
+    return html;
   }
 
   /* ── Map Init ── */
