@@ -1,89 +1,20 @@
 /* ==========================================================================
-   NCSmall.Farm V.2 — Map View (Modular)
-   Google satellite + Guilford County farm classification
-   Ported from AVA V.4 geo-layers.js methodology
-
-   Farm Classification Hierarchy (Guilford County UDO + NC § 160D-903):
-     1. confirmed-farm  → AG/R-A zoned + Bona Fide Farm certificate
-     2. likely-farm     → AG/R-A zoned OR VAD/EVAD enrolled
-     3. potential-farm  → RS-40/RD zoned + Present-Use Value tax
-     4. non-agricultural → CD, R-3, urban parcels
+   NCSmall.Farm V.2 — Map View (Real Data)
+   Google satellite + Guilford County real-time GIS
    ========================================================================== */
 
 (function() {
 
   let mapInstance = null;
-  let markerGroup = null;
   let parcelPolygonGroup = null;
   let filterText = '';
-  let farmFilter = 'ALL';  // ALL, confirmed-farm, likely-farm, potential-farm, non-agricultural
-
-  /* ── Farm Classification Colors & Labels ─────────────────── */
-  const FARM_CLASS = {
-    'confirmed-farm':   { color: '#2E7D32', label: 'Confirmed Farm',    icon: 'verified',         desc: 'AG/R-A + Bona Fide Farm' },
-    'likely-farm':      { color: '#4CAF50', label: 'Likely Farm',       icon: 'agriculture',      desc: 'AG/R-A or VAD enrolled' },
-    'potential-farm':   { color: '#FFC107', label: 'Potential Farm',    icon: 'help_outline',     desc: 'RS-40/RD + PVU tax status' },
-    'non-agricultural': { color: '#78909C', label: 'Non-Agricultural',  icon: 'domain',           desc: 'Urban / Commercial' }
-  };
-
-  /* ── Guilford County Zoning Colors (from AVA) ────────────── */
-  const ZONING_COLORS = {
-    'AG':   '#4CAF50',
-    'R-A':  '#81C784',
-    'RS-40':'#2196F3',
-    'R-3':  '#64B5F6',
-    'RD':   '#AB47BC',
-    'CD':   '#78909C',
-    'PUD':  '#5C6BC0'
-  };
-
-  /* ── Parcel polygon from point + acreage (scaled for visibility) ── */
-  function createParcelBounds(lat, lon, acreage) {
-    // Real size: sqrt(acreage * 4047) meters per side
-    // But at zoom 11 (county view), real parcels are invisible pixels.
-    // Scale up 5x for demo visibility, with a minimum floor.
-    var sideM = Math.sqrt(acreage * 4047) * 5;
-    if (sideM < 600) sideM = 600;  // minimum ~600m so even 5ac parcels show
-    var latDeg = sideM / 111320;
-    var lonDeg = sideM / (111320 * Math.cos(lat * Math.PI / 180));
-    // Slight shape variation so parcels aren't all perfect squares
-    var skew = (acreage % 7) * 0.0001;
-    var stretch = 1 + (acreage % 3) * 0.15;  // some parcels are elongated
-    return [
-      [lat - latDeg/2 + skew,            lon - lonDeg*stretch/2],
-      [lat - latDeg/2,                    lon + lonDeg*stretch/2 + skew],
-      [lat + latDeg/2 - skew/2,           lon + lonDeg*stretch/2],
-      [lat + latDeg/2,                    lon - lonDeg*stretch/2 - skew]
-    ];
-  }
+  let realParcelLayer = null;
+  let lastBbox = null;
+  let isFetchingParcels = false;
+  let totalRealParcelsInView = 0;
 
   /* ── Main Render ─────────────────────────────────────────── */
   window.renderMapView = function() {
-    const parcels = window.DEMO_PARCELS || [];
-
-    // Classification counts
-    const classCount = {};
-    Object.keys(FARM_CLASS).forEach(k => classCount[k] = 0);
-    parcels.forEach(p => { if (classCount[p.farmClass] !== undefined) classCount[p.farmClass]++; });
-
-    // Priority counts
-    const highCount = parcels.filter(p => p.priorityLevel === 'high').length;
-    const medCount = parcels.filter(p => p.priorityLevel === 'medium').length;
-    const lowCount = parcels.filter(p => p.priorityLevel === 'low').length;
-
-    // Financial
-    let totalFunding = 0, totalAcres = 0;
-    let farmAcres = 0;
-    parcels.forEach(p => {
-      totalAcres += p.acreage;
-      if (p.farmClass === 'confirmed-farm' || p.farmClass === 'likely-farm') farmAcres += p.acreage;
-      const parts = p.eqipEstimate.replace(/\$|,/g, '').split('-');
-      if (parts.length > 1) totalFunding += parseInt(parts[1].trim());
-    });
-
-    // Filtered count
-    const filtered = farmFilter === 'ALL' ? parcels : parcels.filter(p => p.farmClass === farmFilter);
-
     setTimeout(() => initMap(), 80);
 
     return h('div', { style: { position: 'relative', width: '100%', height: 'calc(100vh - 64px)' } },
@@ -91,19 +22,16 @@
       // Map container
       h('div', { id: 'nc-farm-map', style: { width: '100%', height: '100%', zIndex: '1' } }),
 
-      // ── Top: Search + Count ──
+      // ── Top: Search ──
       h('div', { style: { position: 'absolute', top: '12px', left: '50%', transform: 'translateX(-50%)', zIndex: '1000', display: 'flex', gap: '8px', alignItems: 'center' } },
         h('div', { style: { display: 'flex', alignItems: 'center', background: 'rgba(10,14,23,0.85)', backdropFilter: 'blur(12px)', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.1)', overflow: 'hidden', width: '360px', boxShadow: '0 4px 20px rgba(0,0,0,0.4)' } },
           h('span', { className: 'material-icons-round', style: { padding: '10px 12px', color: '#94a3b8', fontSize: '18px' } }, 'search'),
           h('input', {
-            type: 'text', placeholder: 'Search address or owner...',
+            type: 'text', placeholder: 'Search address or owner (Coming soon)...',
             style: { flex: '1', border: 'none', outline: 'none', background: 'transparent', color: '#f8fafc', fontSize: '13px', fontWeight: '500', padding: '10px 12px 10px 0', fontFamily: 'Inter, sans-serif' },
             value: filterText,
-            onInput: (e) => { filterText = e.target.value; updateMarkers(); }
+            onInput: (e) => { filterText = e.target.value; }
           })
-        ),
-        h('div', { style: { background: 'rgba(10,14,23,0.85)', backdropFilter: 'blur(12px)', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.1)', padding: '8px 14px', color: '#FDB927', fontSize: '12px', fontWeight: '800', boxShadow: '0 4px 20px rgba(0,0,0,0.4)', whiteSpace: 'nowrap' } },
-          'Showing ' + filtered.length + ' of ' + parcels.length + ' parcels'
         )
       ),
 
@@ -133,11 +61,11 @@
           panel(
             secTitle('Farm Classification'),
             h('div', { style: { fontSize: '9px', color: '#64748b', marginBottom: '8px', lineHeight: '1.4' } }, 'NC § 160D-903 · Guilford County UDO'),
-            farmFilterBtn('ALL', 'All Parcels', '#f8fafc', parcels.length),
-            farmFilterBtn('confirmed-farm', FARM_CLASS['confirmed-farm'].label, FARM_CLASS['confirmed-farm'].color, classCount['confirmed-farm']),
-            farmFilterBtn('likely-farm', FARM_CLASS['likely-farm'].label, FARM_CLASS['likely-farm'].color, classCount['likely-farm']),
-            farmFilterBtn('potential-farm', FARM_CLASS['potential-farm'].label, FARM_CLASS['potential-farm'].color, classCount['potential-farm']),
-            farmFilterBtn('non-agricultural', FARM_CLASS['non-agricultural'].label, FARM_CLASS['non-agricultural'].color, classCount['non-agricultural']),
+            farmFilterBtn('ALL', 'All Parcels', '#f8fafc', '—'),
+            farmFilterBtn('confirmed-farm', 'Confirmed Farm', '#2E7D32', '—'),
+            farmFilterBtn('likely-farm', 'Likely Farm', '#4CAF50', '—'),
+            farmFilterBtn('potential-farm', 'Potential Farm', '#FFC107', '—'),
+            farmFilterBtn('non-agricultural', 'Non-Agricultural', '#78909C', '—'),
             divider(),
             secTitle('Identification Criteria'),
             criteriaRow('verified', 'Bona Fide Farm Cert', '#2E7D32'),
@@ -151,26 +79,81 @@
       // ── Bottom Left: Portfolio Stats ──
       h('div', { style: { position: 'absolute', bottom: '20px', left: '12px', zIndex: '1000', width: '230px' } },
         panel(
-          secTitle('Pre-Analyzed Portfolio'),
-          stat('Confirmed Farms', String(classCount['confirmed-farm']), '#2E7D32'),
-          stat('Likely Farms', String(classCount['likely-farm']), '#4CAF50'),
-          stat('Potential Farms', String(classCount['potential-farm']), '#FFC107'),
-          stat('Farm Acreage', farmAcres.toLocaleString() + ' ac', '#4CAF50'),
-          stat('Total Acreage', totalAcres.toLocaleString() + ' ac', '#f8fafc'),
-          divider(),
-          stat('High Priority', String(highCount), '#e53e3e'),
-          stat('Medium Priority', String(medCount), '#f6ad55'),
-          stat('Low / OK', String(lowCount), '#48bb78'),
-          divider(),
-          h('div', { style: { display: 'flex', justifyContent: 'space-between', padding: '6px 0' } },
-            h('span', { style: { fontSize: '12px', fontWeight: '600', color: '#94a3b8' } }, 'EQIP Potential'),
-            h('span', { style: { fontSize: '15px', fontWeight: '900', color: '#FDB927' } }, '$' + totalFunding.toLocaleString())
+          secTitle('Real-Time Data'),
+          h('div', { id: 'real-parcel-count-label', style: { fontSize: '13px', fontWeight: '800', color: '#f8fafc', padding: '8px 0' } }, `Parcels in View: ${totalRealParcelsInView}`),
+          h('div', { style: { fontSize: '11px', color: '#94a3b8', lineHeight: '1.4' } }, 'Zoom in and click any parcel to load enriched tax and assessment data.')
+        )
+      ),
+
+      // Intake Form Modal (hidden by default)
+      h('div', { id: 'farmer-intake-modal', style: { display: 'none', position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', zIndex: '9999', justifyContent: 'center', alignItems: 'center' } },
+        h('div', { style: { background: 'rgba(10,14,23,0.95)', backdropFilter: 'blur(16px)', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.1)', padding: '24px', width: '450px', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 12px 48px rgba(0,0,0,0.6)' } },
+          h('h2', { style: { margin: '0 0 16px 0', fontSize: '18px', color: '#f8fafc' } }, '🌱 Farm Profile Intake'),
+          
+          h('div', { style: { marginBottom: '12px' } },
+            h('label', { style: { display: 'block', fontSize: '11px', color: '#94a3b8', marginBottom: '4px' } }, 'Owner Name (from GIS)'),
+            h('input', { id: 'intake-owner', type: 'text', style: { width: '100%', padding: '8px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', borderRadius: '6px' } })
           ),
-          divider(),
-          secTitle('Priority Key'),
-          legendDot('#e53e3e', 'High — 3+ resource concerns'),
-          legendDot('#f6ad55', 'Medium — 1-2 concerns'),
-          legendDot('#48bb78', 'Low — assessed OK')
+          
+          h('div', { style: { marginBottom: '12px' } },
+            h('label', { style: { display: 'block', fontSize: '11px', color: '#94a3b8', marginBottom: '4px' } }, 'Property Address'),
+            h('input', { id: 'intake-address', type: 'text', style: { width: '100%', padding: '8px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', borderRadius: '6px' } })
+          ),
+          
+          h('div', { style: { marginBottom: '12px' } },
+            h('label', { style: { display: 'block', fontSize: '11px', color: '#94a3b8', marginBottom: '4px' } }, 'Acreage'),
+            h('input', { id: 'intake-acres', type: 'text', style: { width: '100%', padding: '8px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', borderRadius: '6px' } })
+          ),
+          
+          h('div', { style: { marginBottom: '12px' } },
+            h('label', { style: { display: 'block', fontSize: '11px', color: '#94a3b8', marginBottom: '4px' } }, 'Do you have Bona Fide Farm status?'),
+            h('select', { id: 'intake-bff', style: { width: '100%', padding: '8px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', borderRadius: '6px' } },
+              h('option', { value: 'yes' }, 'Yes'), h('option', { value: 'no' }, 'No'), h('option', { value: 'unsure' }, 'Not Sure')
+            )
+          ),
+          
+          h('div', { style: { marginBottom: '12px' } },
+            h('label', { style: { display: 'block', fontSize: '11px', color: '#94a3b8', marginBottom: '4px' } }, 'Are you enrolled in VAD or EVAD?'),
+            h('select', { id: 'intake-vad', style: { width: '100%', padding: '8px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', borderRadius: '6px' } },
+              h('option', { value: 'none' }, 'None'), h('option', { value: 'vad' }, 'VAD'), h('option', { value: 'evad' }, 'EVAD')
+            )
+          ),
+
+          h('div', { style: { marginBottom: '12px' } },
+            h('label', { style: { display: 'block', fontSize: '11px', color: '#94a3b8', marginBottom: '4px' } }, 'Do you have Present-Use Value (PVU) tax deferral?'),
+            h('select', { id: 'intake-pvu', style: { width: '100%', padding: '8px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', borderRadius: '6px' } },
+              h('option', { value: 'yes' }, 'Yes'), h('option', { value: 'no' }, 'No'), h('option', { value: 'unsure' }, 'Not Sure')
+            )
+          ),
+          
+          h('div', { style: { marginBottom: '12px' } },
+            h('label', { style: { display: 'block', fontSize: '11px', color: '#94a3b8', marginBottom: '4px' } }, 'What do you farm?'),
+            h('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px', fontSize: '12px', color: '#cbd5e1' } },
+              ...['Row Crops', 'Livestock', 'Forestry', 'Horticulture', 'Aquaculture', 'Other'].map(lbl => 
+                h('label', { style: { display: 'flex', alignItems: 'center', gap: '6px' } }, h('input', { type: 'checkbox', value: lbl, className: 'farm-type-chk' }), lbl)
+              )
+            )
+          ),
+          
+          h('div', { style: { marginBottom: '16px' } },
+            h('label', { style: { display: 'block', fontSize: '11px', color: '#94a3b8', marginBottom: '4px' } }, 'Top Resource Concerns'),
+            h('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px', fontSize: '12px', color: '#cbd5e1' } },
+              ...['Soil Erosion', 'Water Quality', 'Drainage', 'Pest Management', 'No Riparian Buffer', 'Nutrient Runoff', 'Pasture Degradation', 'Other'].map(lbl => 
+                h('label', { style: { display: 'flex', alignItems: 'center', gap: '6px' } }, h('input', { type: 'checkbox', value: lbl, className: 'concern-chk' }), lbl)
+              )
+            )
+          ),
+
+          h('div', { style: { display: 'flex', gap: '8px' } },
+            h('button', { 
+              onclick: () => document.getElementById('farmer-intake-modal').style.display = 'none',
+              style: { flex: 1, padding: '10px', background: 'rgba(255,255,255,0.1)', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' } 
+            }, 'Cancel'),
+            h('button', { 
+              onclick: submitIntakeForm,
+              style: { flex: 1, padding: '10px', background: '#3B7A57', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' } 
+            }, 'Complete Profile')
+          )
         )
       )
     );
@@ -195,18 +178,6 @@
   function divider() {
     return h('div', { style: { height: '1px', background: 'rgba(255,255,255,0.06)', margin: '6px 0' } });
   }
-  function stat(label, value, color) {
-    return h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '3px 0' } },
-      h('span', { style: { fontSize: '11px', color: '#94a3b8' } }, label),
-      h('span', { style: { fontSize: '12px', fontWeight: '800', color: color } }, value)
-    );
-  }
-  function legendDot(color, label) {
-    return h('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', padding: '2px 0' } },
-      h('div', { style: { width: '10px', height: '10px', borderRadius: '50%', background: color, border: '2px solid rgba(255,255,255,0.3)', flexShrink: '0' } }),
-      h('span', { style: { fontSize: '10px', color: '#cbd5e1' } }, label)
-    );
-  }
   function criteriaRow(icon, label, color) {
     return h('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', padding: '3px 0' } },
       h('span', { className: 'material-icons-round', style: { fontSize: '13px', color: color } }, icon),
@@ -214,21 +185,19 @@
     );
   }
   function farmFilterBtn(key, label, color, count) {
-    var isActive = farmFilter === key;
     return h('button', {
       style: {
         display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%',
         padding: '6px 8px', marginBottom: '3px', borderRadius: '8px', border: 'none',
-        background: isActive ? color + '25' : 'transparent',
-        cursor: 'pointer', fontFamily: 'Inter, sans-serif', transition: 'all 0.2s'
-      },
-      onclick: function() { farmFilter = key; updateMarkers(); }
+        background: 'transparent',
+        cursor: 'default', fontFamily: 'Inter, sans-serif'
+      }
     },
       h('div', { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
         h('div', { style: { width: '8px', height: '8px', borderRadius: '50%', background: color, flexShrink: '0' } }),
-        h('span', { style: { fontSize: '11px', fontWeight: isActive ? '800' : '500', color: isActive ? color : '#94a3b8' } }, label)
+        h('span', { style: { fontSize: '11px', fontWeight: '500', color: '#94a3b8' } }, label)
       ),
-      h('span', { style: { fontSize: '11px', fontWeight: '800', color: isActive ? color : '#64748b' } }, String(count))
+      h('span', { style: { fontSize: '11px', fontWeight: '800', color: '#64748b' } }, String(count))
     );
   }
   function layerDot(label, icon, color, active) {
@@ -250,51 +219,42 @@
     );
   }
 
-  /* ── Map Init (force fresh — DOM gets wiped by render()) ── */
-  var realParcelLayer = null;
-  var lastBbox = null;
-  var isFetchingParcels = false;
-
+  /* ── Map Init ── */
   function initMap() {
     var container = document.getElementById('nc-farm-map');
-    if (!container) { console.error('[NCSmall Map] No #nc-farm-map container'); return; }
-    if (!window.L) { console.error('[NCSmall Map] Leaflet not loaded'); return; }
+    if (!container) return;
+    if (!window.L) return;
 
     if (mapInstance) { try { mapInstance.remove(); } catch(e) {} mapInstance = null; }
 
     mapInstance = L.map(container, { zoomControl: false, attributionControl: false }).setView([36.07, -79.79], 14);
     window._ncMapInstance = mapInstance;
 
-    // Clean satellite
     L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { maxZoom: 21 }).addTo(mapInstance);
-    // Faded road labels
     L.tileLayer('https://mt1.google.com/vt/lyrs=h&x={x}&y={y}&z={z}', { maxZoom: 21, opacity: 0.4 }).addTo(mapInstance);
 
     L.control.zoom({ position: 'bottomright' }).addTo(mapInstance);
     parcelPolygonGroup = L.layerGroup().addTo(mapInstance);
-    markerGroup = L.layerGroup().addTo(mapInstance);
 
-    // Fetch real parcels on map move (AVA methodology)
     mapInstance.on('moveend', fetchRealParcels);
     mapInstance.on('zoomend', fetchRealParcels);
 
-    updateMarkers();
     setTimeout(function() {
       if (mapInstance) {
         mapInstance.invalidateSize();
-        fetchRealParcels();  // initial load
+        fetchRealParcels(); 
       }
     }, 400);
   }
 
-  /* ── Fetch REAL parcel polygons from gis-proxy (AVA pattern) ── */
+  /* ── Fetch REAL parcel polygons from gis-proxy ── */
   function fetchRealParcels() {
     if (!mapInstance || isFetchingParcels) return;
     var zoom = mapInstance.getZoom();
     if (zoom < 14) {
-      // Too zoomed out — show toast and clear real parcels
       if (realParcelLayer) { mapInstance.removeLayer(realParcelLayer); realParcelLayer = null; }
       showToast('Zoom in to load parcel boundaries', 'info');
+      document.getElementById('real-parcel-count-label').innerText = `Parcels in View: 0`;
       return;
     }
 
@@ -302,13 +262,11 @@
     var bbox = bounds.getWest().toFixed(6) + ',' + bounds.getSouth().toFixed(6) + ',' +
                bounds.getEast().toFixed(6) + ',' + bounds.getNorth().toFixed(6);
 
-    // Skip if same bbox
     if (bbox === lastBbox) return;
     lastBbox = bbox;
     isFetchingParcels = true;
     showToast('Loading parcels...', 'info');
 
-    // Build ArcGIS query params for direct calls
     var w = bounds.getWest().toFixed(6);
     var s = bounds.getSouth().toFixed(6);
     var e = bounds.getEast().toFixed(6);
@@ -318,7 +276,6 @@
       + '&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects'
       + '&outFields=*&returnGeometry=true&outSR=4326&f=geojson&resultRecordCount=500';
 
-    // Cascade: Netlify proxy → Guilford County direct → NC OneMap direct
     var urls = [
       '/.netlify/functions/gis-proxy?service=parcels&bbox=' + w + ',' + s + ',' + e + ',' + n,
       'https://maps.guilfordcountync.gov/arcgis/rest/services/BaseLayers/Parcels/MapServer/0/query?' + arcgisParams,
@@ -346,6 +303,10 @@
         if (!geojson || !geojson.features || !geojson.features.length) {
           throw new Error('empty');
         }
+        totalRealParcelsInView = geojson.features.length;
+        if(document.getElementById('real-parcel-count-label')) {
+            document.getElementById('real-parcel-count-label').innerText = `Parcels in View: ${totalRealParcelsInView}`;
+        }
         renderParcelGeoJSON(geojson);
         var src = idx === 0 ? 'proxy' : (urls[idx].includes('guilford') ? 'Guilford County GIS' : 'NC OneMap');
         showToast(geojson.features.length + ' parcels loaded (' + src + ')', 'success');
@@ -370,21 +331,44 @@
       onEachFeature: function(feature, layer) {
         var p = feature.properties || {};
         var owner = p.owner || p.ownname || p.OWNER_NAME || p.OWNER || p.OWNERNM || 'Unknown';
-        var addr = p.mailadd || p.siteadd || p.SITUS_ADDRESS || p.SITE_ADDR || p.sadd || '';
-        var acres = p.GISACRES || p.gisacres || p.acres || p.CALCACRES || '';
-        var landUse = p.usedesc || p.parusedesc || p.LAND_USE || p.parusecode || '';
+        var addr = p.mailadd || p.siteadd || p.SITUS_ADDRESS || p.SITE_ADDR || p.sadd || 'Unknown Address';
+        var acres = p.GISACRES || p.gisacres || p.acres || p.CALCACRES || '0';
+        var landUse = p.usedesc || p.parusedesc || p.LAND_USE || p.parusecode || 'Unknown';
         var pin = p.parcelnumb || p.parno || p.PARCEL_ID || p.PIN || p.PARID || '';
+        
+        // Escape quotes to safely pass strings in HTML onclick handlers
+        var safeOwner = owner.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+        var safeAddr = addr.replace(/'/g, "\\'").replace(/"/g, '&quot;');
 
-        var popup = '<div style="min-width:220px;font-family:Inter,sans-serif;padding:4px;">'
-          + '<div style="font-weight:900;color:#004684;font-size:14px;margin-bottom:2px;">' + owner + '</div>'
-          + (addr ? '<div style="font-size:11px;color:#94a3b8;margin-bottom:6px;">' + addr + '</div>' : '')
-          + (pin ? '<div style="font-size:10px;color:#64748b;margin-bottom:6px;">PIN: ' + pin + '</div>' : '')
-          + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:6px;">'
-          + (acres ? '<div><div style="font-size:9px;color:#94a3b8;text-transform:uppercase;">Acreage</div><div style="font-weight:800;font-size:14px;">' + parseFloat(acres).toFixed(2) + ' ac</div></div>' : '')
-          + (landUse ? '<div><div style="font-size:9px;color:#94a3b8;text-transform:uppercase;">Land Use</div><div style="font-size:11px;font-weight:600;">' + landUse + '</div></div>' : '')
+        var popupContent = '<div id="popup-' + pin + '" style="min-width:280px;font-family:Inter,sans-serif;padding:4px;">'
+          + '<div style="font-weight:900;color:#004684;font-size:15px;margin-bottom:2px;">' + owner + '</div>'
+          + '<div style="font-size:11px;color:#94a3b8;margin-bottom:6px;">' + addr + '</div>'
+          + (pin ? '<div style="font-size:10px;color:#64748b;margin-bottom:12px;">PIN: ' + pin + '</div>' : '')
+          
+          + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">'
+          + '<div><div style="font-size:9px;color:#94a3b8;text-transform:uppercase;">Acreage</div><div style="font-weight:800;font-size:14px;">' + parseFloat(acres).toFixed(2) + ' ac</div></div>'
+          + '<div><div style="font-size:9px;color:#94a3b8;text-transform:uppercase;">Land Use</div><div style="font-size:11px;font-weight:600;">' + landUse + '</div></div>'
           + '</div>'
+          
+          + '<div id="tax-data-' + pin + '" style="margin-bottom:12px; padding: 8px; background: rgba(0,70,132,0.05); border-radius: 6px;">'
+          + '<div style="font-size:11px;color:#64748b;display:flex;align-items:center;gap:4px;"><span class="material-icons-round" style="font-size:14px;">sync</span> Loading tax data...</div>'
+          + '</div>'
+
+          + '<div style="display:flex;gap:6px;margin-bottom:12px;">'
+          + '<a href="https://gisdv.guilfordcountync.gov/Guilford/?pin=' + pin + '" target="_blank" style="flex:1;text-align:center;padding:6px;background:#e2e8f0;color:#334155;border-radius:4px;font-size:10px;font-weight:bold;text-decoration:none;">View on County GIS</a>'
+          + '<a href="https://lrcpwa.ncptscloud.com/guilford/" target="_blank" style="flex:1;text-align:center;padding:6px;background:#e2e8f0;color:#334155;border-radius:4px;font-size:10px;font-weight:bold;text-decoration:none;">View Tax Record</a>'
+          + '</div>'
+
+          + '<button onclick="window.openIntakeForm(\'' + pin + '\', \'' + safeOwner + '\', \'' + safeAddr + '\', \'' + acres + '\')" style="width:100%;padding:10px;background:#3B7A57;color:white;border:none;border-radius:8px;font-weight:800;font-size:12px;cursor:pointer;font-family:Inter,sans-serif;box-shadow:0 4px 12px rgba(59,122,87,0.3);">🌱 This Is My Farm — Start Assessment</button>'
           + '</div>';
-        layer.bindPopup(popup, { maxWidth: 280 });
+          
+        layer.bindPopup(popupContent, { maxWidth: 320 });
+
+        layer.on('popupopen', function() {
+           if (pin) {
+               fetchEnrichedTaxData(pin, acres, landUse);
+           }
+        });
 
         layer.on('mouseover', function() {
           this.setStyle({ weight: 4, fillOpacity: 0.25, color: '#FFD700' });
@@ -394,6 +378,127 @@
         });
       }
     }).addTo(mapInstance);
+  }
+
+  const EQIP_PRACTICES = {
+    'cover_crop':      { code: '340', name: 'Cover Crop',           unit: 'acre', rateMin: 50,  rateMax: 80,  triggers: ['cropland', 'row crops'] },
+    'nutrient_mgmt':   { code: '590', name: 'Nutrient Management',  unit: 'acre', rateMin: 8,   rateMax: 12,  triggers: ['any'] },
+    'prescribed_graze':{ code: '528', name: 'Prescribed Grazing',   unit: 'acre', rateMin: 12,  rateMax: 18,  triggers: ['livestock', 'pasture'] },
+    'riparian_buffer': { code: '391', name: 'Riparian Forest Buffer',unit: 'acre', rateMin: 200, rateMax: 400, triggers: ['near_water'] },
+    'high_tunnel':     { code: '325', name: 'High Tunnel System',   unit: 'each', rateMin: 7000,rateMax: 25000,triggers: ['horticulture', 'small_farm'] },
+    'fence':           { code: '382', name: 'Fence (Rotational)',    unit: 'lin ft',rateMin: 2, rateMax: 8,   triggers: ['livestock'] },
+    'erosion_control': { code: '600', name: 'Terrace',              unit: 'lin ft',rateMin: 3, rateMax: 12,  triggers: ['slope_high'] },
+    'waterway':        { code: '412', name: 'Grassed Waterway',     unit: 'acre', rateMin: 800, rateMax: 2000,triggers: ['erosion', 'slope_high'] }
+  };
+
+  function fetchEnrichedTaxData(pin, acres, landUse) {
+      const container = document.getElementById('tax-data-' + pin);
+      if(!container) return;
+
+      fetch('/.netlify/functions/parcel-lookup?pin=' + pin)
+        .then(res => res.json())
+        .then(data => {
+            if(!container) return;
+            
+            if(data.error) {
+                container.innerHTML = '<div style="font-size:10px;color:#e53e3e;">Failed to load enriched data.</div>';
+                return;
+            }
+
+            const valFmt = v => v ? '$' + Number(v).toLocaleString() : 'N/A';
+            let html = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">';
+            html += '<div><div style="font-size:9px;color:#94a3b8;text-transform:uppercase;">Assessed Value</div><div style="font-weight:800;font-size:13px;color:#004684;">' + valFmt(data.assessedValue) + '</div></div>';
+            
+            if (data.deferredValue && Number(data.deferredValue) > 0) {
+               html += '<div><div style="font-size:9px;color:#94a3b8;text-transform:uppercase;">Deferred (PVU)</div><div style="font-weight:800;font-size:13px;color:#2E7D32;">' + valFmt(data.deferredValue) + '</div><div style="font-size:9px;color:#4CAF50;font-weight:bold;">✓ PVU Enrolled</div></div>';
+            } else {
+               html += '<div><div style="font-size:9px;color:#94a3b8;text-transform:uppercase;">Property Type</div><div style="font-weight:600;font-size:12px;">' + (data.propertyType || 'N/A') + '</div></div>';
+            }
+            html += '</div>';
+
+            html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">';
+            html += '<div><div style="font-size:9px;color:#94a3b8;text-transform:uppercase;">Year Built</div><div style="font-size:11px;font-weight:600;">' + (data.yearBuilt || 'N/A') + '</div></div>';
+            html += '<div><div style="font-size:9px;color:#94a3b8;text-transform:uppercase;">Structure Size</div><div style="font-size:11px;font-weight:600;">' + (data.structureSize ? Number(data.structureSize).toLocaleString() + ' sqft' : 'N/A') + '</div></div>';
+            html += '</div>';
+
+            // Auto-generate EQIP Opportunity Card
+            let recommended = [];
+            let minTotal = 0; let maxTotal = 0;
+            let ac = parseFloat(acres) || 0;
+            
+            if (ac > 0) {
+              recommended.push(EQIP_PRACTICES.nutrient_mgmt);
+              minTotal += ac * EQIP_PRACTICES.nutrient_mgmt.rateMin;
+              maxTotal += ac * EQIP_PRACTICES.nutrient_mgmt.rateMax;
+              
+              if (ac < 10) {
+                 recommended.push(EQIP_PRACTICES.high_tunnel);
+                 minTotal += EQIP_PRACTICES.high_tunnel.rateMin;
+                 maxTotal += EQIP_PRACTICES.high_tunnel.rateMax;
+              } else {
+                 recommended.push(EQIP_PRACTICES.cover_crop);
+                 minTotal += ac * EQIP_PRACTICES.cover_crop.rateMin;
+                 maxTotal += ac * EQIP_PRACTICES.cover_crop.rateMax;
+              }
+            }
+
+            if (recommended.length > 0) {
+                html += '<div style="margin-top: 12px; padding: 12px; background: rgba(59,122,87,0.1); border-left: 4px solid #3B7A57; border-radius: 4px;">';
+                html += '<div style="font-size:12px; font-weight:800; color:#3B7A57; margin-bottom:4px; display:flex; align-items:center; gap:4px;"><span class="material-icons-round" style="font-size:14px;">payments</span> EQIP Opportunity</div>';
+                html += '<div style="font-size:10px; color:#cbd5e1; margin-bottom:8px;">You may be eligible for NRCS conservation funding:</div>';
+                html += '<ul style="margin:0; padding-left:16px; font-size:10px; color:#f8fafc; margin-bottom:8px;">';
+                recommended.forEach(p => {
+                    html += `<li><b>${p.name}</b> ($${p.rateMin}-${p.rateMax}/${p.unit})</li>`;
+                });
+                html += '</ul>';
+                html += `<div style="font-size:12px; font-weight:800; color:#FDB927;">Est. Potential: $${Math.round(minTotal).toLocaleString()} - $${Math.round(maxTotal).toLocaleString()}</div>`;
+                html += '<div style="font-size:9px; color:#94a3b8; margin-top:6px;">* Historically Underserved producers may qualify for higher rates.</div>';
+                html += '</div>';
+            }
+
+            container.innerHTML = html;
+        })
+        .catch(err => {
+            if(!container) return;
+            container.innerHTML = '<div style="font-size:10px;color:#e53e3e;">Tax lookup failed.</div>';
+        });
+  }
+
+  /* ── Form Intake ─────────────────────────────────────────── */
+  let currentIntakePin = '';
+
+  window.openIntakeForm = function(pin, owner, address, acres) {
+      currentIntakePin = pin;
+      document.getElementById('intake-owner').value = owner || '';
+      document.getElementById('intake-address').value = address || '';
+      document.getElementById('intake-acres').value = acres ? parseFloat(acres).toFixed(2) : '';
+      
+      // reset checkboxes
+      document.querySelectorAll('.farm-type-chk, .concern-chk').forEach(c => c.checked = false);
+      
+      document.getElementById('farmer-intake-modal').style.display = 'flex';
+  };
+
+  function submitIntakeForm() {
+      const data = {
+          pin: currentIntakePin,
+          owner: document.getElementById('intake-owner').value,
+          address: document.getElementById('intake-address').value,
+          acres: document.getElementById('intake-acres').value,
+          bonaFideFarm: document.getElementById('intake-bff').value,
+          vadEnrolled: document.getElementById('intake-vad').value,
+          pvu: document.getElementById('intake-pvu').value,
+          farmTypes: Array.from(document.querySelectorAll('.farm-type-chk:checked')).map(c => c.value),
+          concerns: Array.from(document.querySelectorAll('.concern-chk:checked')).map(c => c.value),
+          timestamp: new Date().toISOString()
+      };
+
+      if (currentIntakePin) {
+          localStorage.setItem('farm_profile_' + currentIntakePin, JSON.stringify(data));
+      }
+
+      document.getElementById('farmer-intake-modal').style.display = 'none';
+      showToast('Profile saved successfully! Ready for full assessment.', 'success');
   }
 
   /* ── Toast notification ──────────────────────────────────── */
@@ -415,73 +520,6 @@
     document.body.appendChild(toast);
     setTimeout(function() { if (toast.parentNode) toast.remove(); }, 3000);
   }
-
-  /* ── Demo parcel markers (priority dots + popups) ────────── */
-  function updateMarkers() {
-    if (!mapInstance || !markerGroup) return;
-    markerGroup.clearLayers();
-
-    var parcels = window.DEMO_PARCELS || [];
-    var q = filterText.toLowerCase();
-
-    parcels.forEach(function(p) {
-      if (q && !p.address.toLowerCase().includes(q) && !p.owner.toLowerCase().includes(q)) return;
-      if (farmFilter !== 'ALL' && p.farmClass !== farmFilter) return;
-
-      var fc = FARM_CLASS[p.farmClass] || FARM_CLASS['non-agricultural'];
-      var zColor = ZONING_COLORS[p.zoning] || '#94a3b8';
-
-      var dotColor = '#48bb78';
-      if (p.priorityLevel === 'high')   dotColor = '#e53e3e';
-      if (p.priorityLevel === 'medium') dotColor = '#f6ad55';
-
-      // Priority dot (no fake polygon — real parcels come from GIS)
-      var centerMarker = L.circleMarker([p.lat, p.lon], {
-        radius: 10, fillColor: dotColor, color: '#fff',
-        weight: 2.5, opacity: 1, fillOpacity: 0.9
-      });
-
-      var badges = [];
-      if (p.bonaFideFarm) badges.push('<span style="padding:2px 6px;border-radius:3px;font-size:9px;font-weight:700;background:#2E7D3222;color:#2E7D32;border:1px solid #2E7D3244;">✓ Bona Fide Farm</span>');
-      if (p.vadEnrolled && p.vadEnrolled !== 'none') badges.push('<span style="padding:2px 6px;border-radius:3px;font-size:9px;font-weight:700;background:#4CAF5022;color:#4CAF50;border:1px solid #4CAF5044;">' + p.vadEnrolled + ' Enrolled</span>');
-      if (p.pvuStatus) badges.push('<span style="padding:2px 6px;border-radius:3px;font-size:9px;font-weight:700;background:#FFC10722;color:#F57F17;border:1px solid #FFC10744;">PVU Tax</span>');
-
-      var popup = '<div style="min-width:250px;font-family:Inter,sans-serif;padding:4px;">'
-        + '<div style="font-weight:900;color:#004684;font-size:15px;margin-bottom:2px;">' + p.owner + '</div>'
-        + '<div style="font-size:11px;color:#94a3b8;margin-bottom:8px;">' + p.address + '</div>'
-        + '<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px;">'
-        + '<span style="padding:3px 8px;border-radius:4px;font-size:10px;font-weight:700;background:' + fc.color + '22;color:' + fc.color + ';border:1px solid ' + fc.color + '44;">' + fc.label + '</span>'
-        + '<span style="padding:3px 8px;border-radius:4px;font-size:10px;font-weight:700;background:' + zColor + '22;color:' + zColor + ';border:1px solid ' + zColor + '44;">' + p.zoning + ' — ' + (p.zoningDesc || '') + '</span>'
-        + '</div>'
-        + (badges.length ? '<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px;">' + badges.join('') + '</div>' : '')
-        + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">'
-        + '<div><div style="font-size:9px;color:#94a3b8;text-transform:uppercase;">Acreage</div><div style="font-weight:800;font-size:14px;">' + p.acreage + ' ac</div></div>'
-        + '<div><div style="font-size:9px;color:#94a3b8;text-transform:uppercase;">EQIP Est.</div><div style="font-weight:800;font-size:14px;color:#3B7A57;">' + p.eqipEstimate + '</div></div>'
-        + '</div>'
-        + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">'
-        + '<div><div style="font-size:9px;color:#94a3b8;text-transform:uppercase;">Soil</div><div style="font-size:11px;font-weight:600;">' + p.soilType + '</div></div>'
-        + '<div><div style="font-size:9px;color:#94a3b8;text-transform:uppercase;">Slope</div><div style="font-size:11px;font-weight:600;">' + p.slopePct + '</div></div>'
-        + '</div>'
-        + '<div style="margin-bottom:8px;"><div style="font-size:9px;color:#94a3b8;text-transform:uppercase;">Land Use</div><div style="font-size:11px;font-weight:600;color:#4CAF50;">' + (p.landUse || 'Agricultural') + '</div></div>'
-        + '<div style="margin-bottom:8px;"><div style="font-size:9px;color:#94a3b8;text-transform:uppercase;">Resource Concerns</div><div style="font-size:11px;color:#e53e3e;font-weight:600;line-height:1.5;">' + p.concerns.join('<br>') + '</div></div>'
-        + '<button onclick="window.selectParcelAndAssess(\'' + p.id + '\')" style="width:100%;padding:11px;background:linear-gradient(135deg,#004684,#003366);color:white;border:none;border-radius:10px;font-weight:800;font-size:13px;cursor:pointer;font-family:Inter,sans-serif;letter-spacing:0.03em;box-shadow:0 4px 12px rgba(0,70,132,0.3);">VIEW FULL ASSESSMENT</button>'
-        + '</div>';
-
-      centerMarker.bindPopup(popup, { maxWidth: 320 });
-      markerGroup.addLayer(centerMarker);
-    });
-  }
-
-  window.selectParcelAndAssess = function(id) {
-    var parcel = (window.DEMO_PARCELS || []).find(function(p) { return p.id === id; });
-    if (parcel && window.st) {
-      window.st.selectedParcel = parcel;
-      mapInstance = null;
-      markerGroup = null;
-      parcelPolygonGroup = null;
-      window.setView('farm-assessment');
-    }
-  };
 
 })();
 
