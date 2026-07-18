@@ -21,28 +21,56 @@
     'non-agricultural': { color: '#78909C', fill: 'rgba(120,144,156,0.08)', label: 'Non-Agricultural' }
   };
 
-  function classifyParcel(landUse, acres) {
-    var lu = (landUse || '').toUpperCase();
+  function classifyParcel(landUse, acres, useCode) {
+    var lu = (landUse || '').toUpperCase().trim();
+    var code = (useCode || '').toUpperCase().trim();
     var ac = parseFloat(acres) || 0;
-    // Confirmed: explicitly agricultural land use
+
+    // ── NC Property Tax Use Codes (numeric) ──────────────────
+    // 600-699 = Agricultural, 700-799 = Forest/Timber
+    var numCode = parseInt(code) || parseInt(lu);
+    if (numCode >= 600 && numCode < 800) return 'confirmed-farm';
+    if (numCode >= 500 && numCode < 600 && ac >= 5) return 'likely-farm'; // Exempt/special use
+
+    // ── Text-based classification ────────────────────────────
+    // Confirmed: explicitly agricultural
     if (lu.includes('AGRI') || lu.includes('FARM') || lu.includes('CROP') ||
         lu.includes('DAIRY') || lu.includes('LIVESTOCK') || lu.includes('ORCHARD') ||
         lu.includes('TIMBER') || lu.includes('FOREST') || lu.includes('HORTI') ||
-        lu.includes('NURSERY') || lu.includes('POULTRY') || lu.includes('RANCH')) {
+        lu.includes('NURSERY') || lu.includes('POULTRY') || lu.includes('RANCH') ||
+        lu.includes('PASTURE') || lu.includes('GRAZING') || lu.includes('TOBACCO') ||
+        lu.includes('HAY') || lu.includes('GRAIN') || lu.includes('CATTLE') ||
+        lu.includes('SWINE') || lu.includes('EQUINE') || lu.includes('HORSE') ||
+        lu.includes('AQUA') || lu.includes('VINEYARD') || lu.includes('GARDEN') ||
+        lu.includes('COTTON') || lu.includes('SOD') || lu.includes('GOAT') ||
+        code.includes('AGRI') || code.includes('FARM') || code.includes('CROP') ||
+        code.includes('TIMBER') || code.includes('FOREST')) {
       return 'confirmed-farm';
     }
-    // Likely: rural residential with significant acreage
-    if ((lu.includes('RURAL') || lu.includes('R-A') || lu.includes('AG')) && ac >= 5) {
+
+    // Likely: rural/agricultural zoning with land
+    if ((lu.includes('RURAL') || lu.includes('R-A') || lu.includes('AG ') ||
+         lu === 'AG' || lu.startsWith('AG-') || lu.includes('ESTATE') ||
+         code.includes('RURAL') || code.includes('AG')) && ac >= 3) {
       return 'likely-farm';
     }
-    // Potential: residential with 10+ acres (could be farmed)
-    if (lu.includes('RESID') && ac >= 10) {
+
+    // Potential: large residential (could be farmed)
+    if (ac >= 10 && (lu.includes('RESID') || lu.includes('SINGLE') || 
+        lu.includes('DWELLING') || lu.includes('HOUSE') || numCode >= 100 && numCode < 200)) {
       return 'potential-farm';
     }
-    // Potential: vacant land with 5+ acres
-    if ((lu.includes('VACANT') || lu.includes('UNIMP') || lu === '' || lu === 'UNKNOWN') && ac >= 5) {
+
+    // Potential: vacant/unimproved land with acreage
+    if (ac >= 5 && (lu.includes('VACANT') || lu.includes('UNIMP') || lu.includes('UNDEVEL') ||
+        lu.includes('OPEN') || lu.includes('WILD') || lu === '' || lu === 'UNKNOWN' ||
+        numCode >= 800 && numCode < 900)) {
       return 'potential-farm';
     }
+
+    // Potential: any parcel 20+ acres regardless of classification
+    if (ac >= 20) return 'potential-farm';
+
     return 'non-agricultural';
   }
 
@@ -413,30 +441,26 @@
     // Track classification counts
     var classCounts = { 'confirmed-farm': 0, 'likely-farm': 0, 'potential-farm': 0, 'non-agricultural': 0 };
     var farmAcres = 0;
-    var skipped = 0;
+    var debugLandUses = {};
 
     realParcelLayer = L.geoJSON(geojson, {
-      filter: function(feature) {
-        // Only show farm parcels — skip non-agricultural
-        var p = feature.properties || {};
-        var landUse = p.usedesc || p.parusedesc || p.LAND_USE || p.parusecode || '';
-        var acres = p.GISACRES || p.gisacres || p.acres || p.CALCACRES || '0';
-        var cls = classifyParcel(landUse, acres);
-        if (cls === 'non-agricultural') {
-          classCounts['non-agricultural']++;
-          skipped++;
-          return false; // don't render
-        }
-        return true;
-      },
       style: function(feature) {
         var p = feature.properties || {};
         var landUse = p.usedesc || p.parusedesc || p.LAND_USE || p.parusecode || '';
+        var useCode = p.usecode || p.parusecode || p.LAND_USE_CODE || p.LUSECODE || '';
         var acres = p.GISACRES || p.gisacres || p.acres || p.CALCACRES || '0';
-        var cls = classifyParcel(landUse, acres);
+        var cls = classifyParcel(landUse, acres, useCode);
         var fc = FARM_CLASS[cls];
+        
+        // Debug: track what land use values we see
+        var key = landUse || useCode || '(empty)';
+        debugLandUses[key] = (debugLandUses[key] || 0) + 1;
+
+        if (cls === 'non-agricultural') {
+          return { color: '#78909C', weight: 1, fillColor: '#78909C', fillOpacity: 0.05, opacity: 0.4 };
+        }
         return {
-          color: '#FDB927',       // Gold outline on all farm parcels
+          color: '#FDB927',       // Gold outline on farm parcels
           weight: 2.5,
           fillColor: fc.color,    // Bold classification color fill
           fillOpacity: 0.4,       // Strong visible fill
@@ -449,8 +473,9 @@
         var addr = p.mailadd || p.siteadd || p.SITUS_ADDRESS || p.SITE_ADDR || p.sadd || 'Unknown Address';
         var acres = p.GISACRES || p.gisacres || p.acres || p.CALCACRES || '0';
         var landUse = p.usedesc || p.parusedesc || p.LAND_USE || p.parusecode || 'Unknown';
+        var useCode = p.usecode || p.parusecode || p.LAND_USE_CODE || p.LUSECODE || '';
         var pin = p.parcelnumb || p.parno || p.PARCEL_ID || p.PIN || p.PARID || '';
-        var cls = classifyParcel(landUse, acres);
+        var cls = classifyParcel(landUse, acres, useCode);
         var fc = FARM_CLASS[cls];
 
         // Track counts
@@ -508,6 +533,9 @@
 
     // Update legend counts
     updateClassCounts(classCounts, farmAcres);
+    // Debug: show what land use values we got from GIS
+    console.log('[NCSmall] Land use values from GIS:', debugLandUses);
+    console.log('[NCSmall] Classification counts:', classCounts);
   }
 
   function updateClassCounts(counts, farmAcres) {
