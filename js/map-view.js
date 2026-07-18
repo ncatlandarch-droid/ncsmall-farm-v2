@@ -82,8 +82,15 @@
       return 'potential-farm';
     }
 
-    // Potential: any parcel 20+ acres regardless of classification
-    if (ac >= 20) return 'potential-farm';
+    // Potential: large unclassified parcels — but NOT industrial/commercial/govt
+    if (ac >= 20 && !lu.includes('IND') && !lu.includes('COMM') && !lu.includes('OFFIC') &&
+        !lu.includes('RETAIL') && !lu.includes('WAREHOUSE') && !lu.includes('MANUFACT') &&
+        !lu.includes('UTIL') && !lu.includes('GOVT') && !lu.includes('EXEMPT') &&
+        !lu.includes('CHURCH') && !lu.includes('SCHOOL') && !lu.includes('HOSPITAL') &&
+        !lu.includes('AIRPORT') && !lu.includes('RAIL') && !lu.includes('MINING') &&
+        !lu.includes('CONDO') && !lu.includes('COMMON') && !lu.includes('MULTI')) {
+      return 'potential-farm';
+    }
 
     return 'non-agricultural';
   }
