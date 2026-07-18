@@ -358,8 +358,22 @@
     // Track classification counts
     var classCounts = { 'confirmed-farm': 0, 'likely-farm': 0, 'potential-farm': 0, 'non-agricultural': 0 };
     var farmAcres = 0;
+    var skipped = 0;
 
     realParcelLayer = L.geoJSON(geojson, {
+      filter: function(feature) {
+        // Only show farm parcels — skip non-agricultural
+        var p = feature.properties || {};
+        var landUse = p.usedesc || p.parusedesc || p.LAND_USE || p.parusecode || '';
+        var acres = p.GISACRES || p.gisacres || p.acres || p.CALCACRES || '0';
+        var cls = classifyParcel(landUse, acres);
+        if (cls === 'non-agricultural') {
+          classCounts['non-agricultural']++;
+          skipped++;
+          return false; // don't render
+        }
+        return true;
+      },
       style: function(feature) {
         var p = feature.properties || {};
         var landUse = p.usedesc || p.parusedesc || p.LAND_USE || p.parusecode || '';
@@ -367,11 +381,11 @@
         var cls = classifyParcel(landUse, acres);
         var fc = FARM_CLASS[cls];
         return {
-          color: fc.color,
-          weight: cls === 'non-agricultural' ? 1 : 2.5,
-          fillColor: fc.fill,
-          fillOpacity: cls === 'non-agricultural' ? 0.04 : 0.15,
-          opacity: cls === 'non-agricultural' ? 0.5 : 0.9
+          color: '#FDB927',       // Gold outline on all farm parcels
+          weight: 2.5,
+          fillColor: fc.color,    // Bold classification color fill
+          fillOpacity: 0.4,       // Strong visible fill
+          opacity: 0.9
         };
       },
       onEachFeature: function(feature, layer) {
@@ -425,18 +439,14 @@
            if (pin) fetchEnrichedTaxData(pin, acres, landUse);
         });
 
-        // Store classification color on the layer for mouseout restore
+        // Store classification for mouseout restore
         layer._ncClass = cls;
         layer.on('mouseover', function() {
-          this.setStyle({ weight: 4, fillOpacity: 0.3, color: '#FFD700' });
+          this.setStyle({ weight: 4, fillOpacity: 0.55, color: '#FFD700' });
         });
         layer.on('mouseout', function() {
-          var c = FARM_CLASS[this._ncClass] || FARM_CLASS['non-agricultural'];
-          this.setStyle({ 
-            weight: this._ncClass === 'non-agricultural' ? 1 : 2.5, 
-            fillOpacity: this._ncClass === 'non-agricultural' ? 0.04 : 0.15, 
-            color: c.color 
-          });
+          var c = FARM_CLASS[this._ncClass] || FARM_CLASS['confirmed-farm'];
+          this.setStyle({ weight: 2.5, fillOpacity: 0.4, color: '#FDB927' });
         });
       }
     }).addTo(mapInstance);
