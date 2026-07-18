@@ -69,9 +69,9 @@
       return 'potential-farm';
     }
 
-    // Potential: conservation/development-restricted/wildlife land
+    // Potential: conservation/wildlife land
     if (lu.includes('CONSERV') || lu.includes('EASEMENT') || lu.includes('PRESERVE') || 
-        lu.includes('WILDLIFE') || lu.includes('DEVELOPMT') || lu.includes('RESTRICTED')) {
+        lu.includes('WILDLIFE')) {
       return 'potential-farm';
     }
 
@@ -455,32 +455,6 @@
       farmPinsLayer.addLayer(marker);
     });
 
-    // Also show known farms from static list (if loaded)
-    if (window.KNOWN_FARMS) {
-      window.KNOWN_FARMS.forEach(function(farm) {
-        var marker = L.marker([farm.lat, farm.lng], {
-          icon: L.divIcon({
-            className: 'known-farm-pin-star',
-            html: '<div style="background:#FDB927;color:#1a1a2e;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.5);font-size:14px;cursor:pointer;"><span class="material-icons-round" style="font-size:16px;">star</span></div>',
-            iconSize: [28, 28],
-            iconAnchor: [14, 28]
-          })
-        });
-        var stars = '';
-        for (var s = 0; s < 5; s++) stars += s < Math.round(farm.rating) ? '★' : '☆';
-        var tip = '<div style="font-family:Inter,sans-serif;min-width:180px;">'
-          + '<div style="font-weight:900;font-size:13px;color:#FDB927;">⭐ ' + farm.name + '</div>'
-          + '<div style="font-size:10px;color:#64748b;margin:2px 0;">' + farm.addr + '</div>'
-          + '<div style="font-size:10px;color:#FDB927;">' + stars + ' <span style="color:#94a3b8;">' + farm.rating + '</span></div>'
-          + '<div style="font-size:10px;font-weight:600;color:#4CAF50;margin-top:2px;">' + farm.type + '</div>'
-          + '</div>';
-        marker.bindTooltip(tip, { direction: 'top', className: 'farm-tooltip', offset: [0, -10] });
-        marker.on('click', function() {
-          mapInstance.setView([farm.lat, farm.lng], 16);
-        });
-        farmPinsLayer.addLayer(marker);
-      });
-    }
   }
 
   /* ── Address Geocoding (ArcGIS World Geocoder — free) ──── */

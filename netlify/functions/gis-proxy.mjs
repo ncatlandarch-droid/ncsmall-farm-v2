@@ -177,8 +177,7 @@ async function fetchFarms(w, s, e, n) {
     "parusedesc LIKE '%COTTON%'",
     "parusedesc LIKE '%GOAT%'",
     "parusedesc LIKE '%SOD%'",
-    "parusedesc LIKE '%CONSERV%'",
-    "parusedesc LIKE '%DEVELOPMT%'"
+    "parusedesc LIKE '%CONSERV%'"
   ].join(' OR ');
 
   const params = new URLSearchParams({
