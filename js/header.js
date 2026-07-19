@@ -61,13 +61,33 @@
       title: 'Toggle Voice'
     }, h('span', { className: 'material-icons-round', style: { fontSize: '20px', color: st.voiceOn ? '#004684' : '#94a3b8' } }, st.voiceOn ? 'volume_up' : 'volume_off'));
 
-    // Language selector (matches original "usEN" style)
-    const langBtn = h('button', {
-      style: { display: 'flex', alignItems: 'center', gap: '2px', padding: '4px 8px', borderRadius: '4px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: '12px', fontWeight: '700', color: '#334155', fontFamily: 'Inter, sans-serif' },
-      onclick: () => { const nl = st.language === 'en' ? 'es' : 'en'; if (window.changeLang) window.changeLang(nl); }
-    },
-      h('span', { style: { fontSize: '11px', color: '#94a3b8' } }, 'us'),
-      h('span', { style: { fontWeight: '800' } }, st.language.toUpperCase())
+    // Language selector — 8-language dropdown
+    const currentLang = window.getCurrentLang ? window.getCurrentLang() : { flag: '🇺🇸', native: 'EN', code: 'en' };
+    const langs = window.I18N_LANGUAGES || [{ code: 'en', flag: '🇺🇸', native: 'English' }];
+
+    const langBtn = h('div', { style: { position: 'relative' } },
+      h('button', {
+        style: { display: 'flex', alignItems: 'center', gap: '5px', padding: '5px 10px', borderRadius: '8px', border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer', fontSize: '13px', fontWeight: '700', color: '#334155', fontFamily: 'Inter, sans-serif', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' },
+        onclick: () => { st.langMenuOpen = !st.langMenuOpen; window.render(); }
+      },
+        h('span', { style: { fontSize: '16px', lineHeight: '1' } }, currentLang.flag),
+        h('span', { style: { fontWeight: '800', fontSize: '11px' } }, currentLang.code.toUpperCase()),
+        h('span', { className: 'material-icons-round', style: { fontSize: '14px', color: '#94a3b8' } }, st.langMenuOpen ? 'expand_less' : 'expand_more')
+      ),
+      st.langMenuOpen ? h('div', {
+        style: { position: 'absolute', top: '110%', right: '0', background: '#fff', borderRadius: '12px', boxShadow: '0 8px 32px rgba(0,0,0,0.18)', border: '1px solid #e2e8f0', zIndex: '9999', minWidth: '180px', padding: '6px 0', animation: 'fade-in 0.15s ease-out' }
+      },
+        ...langs.map(l => h('button', {
+          style: { display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '10px 16px', border: 'none', background: l.code === st.language ? 'rgba(0,70,132,0.08)' : 'transparent', cursor: 'pointer', fontSize: '13px', fontFamily: 'Inter, sans-serif', color: l.code === st.language ? '#004684' : '#334155', fontWeight: l.code === st.language ? '800' : '500', textAlign: 'left', borderLeft: l.code === st.language ? '3px solid #004684' : '3px solid transparent' },
+          onmouseenter: function() { if (l.code !== st.language) this.style.background = '#f8fafc'; },
+          onmouseleave: function() { if (l.code !== st.language) this.style.background = 'transparent'; },
+          onclick: () => { if (window.changeLang) window.changeLang(l.code); }
+        },
+          h('span', { style: { fontSize: '18px', lineHeight: '1' } }, l.flag),
+          h('span', null, l.native),
+          l.code === st.language ? h('span', { className: 'material-icons-round', style: { fontSize: '16px', color: '#004684', marginLeft: 'auto' } }, 'check') : null
+        ))
+      ) : null
     );
 
     // Login button

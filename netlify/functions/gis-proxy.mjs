@@ -4,7 +4,7 @@
 // Netlify.env.get() which requires an explicit @netlify/functions import.
 const CORS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, OPTIONS',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type',
   'Cache-Control': 'public, max-age=300'
 };
@@ -14,6 +14,15 @@ const MAX_BBOX_DEG = 0.20;
 export default async (request) => {
   if (request.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: CORS });
+  }
+  // Handle POST — translation endpoint
+  if (request.method === 'POST') {
+    const url = new URL(request.url);
+    const layer = url.searchParams.get('layer');
+    if (layer === 'gemini-translate') {
+      return await handleTranslate(request);
+    }
+    return json({ error: 'Method not allowed' }, 405);
   }
   if (request.method !== 'GET') {
     return json({ error: 'Method not allowed' }, 405);
@@ -789,4 +798,45 @@ function json(obj, status = 200) {
   return new Response(JSON.stringify(obj), {
     status, headers: { 'Content-Type': 'application/json', ...CORS }
   });
+}
+
+// ---------------------------------------------------------------------------
+// Gemini Translation Handler — POST endpoint for i18n
+// ---------------------------------------------------------------------------
+async function handleTranslate(request) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) return json({ error: 'GEMINI_API_KEY not configured' }, 503);
+
+  let body;
+  try { body = await request.json(); } catch(e) { return json({ error: 'Invalid JSON body' }, 400); }
+  if (!body.prompt) return json({ error: 'Missing prompt' }, 400);
+
+  try {
+    const resp = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: body.prompt }] }],
+          generationConfig: { temperature: 0.1, maxOutputTokens: 4096 }
+        }),
+        signal: AbortSignal.timeout(20000)
+      }
+    );
+    if (!resp.ok) throw new Error(`Gemini API ${resp.status}`);
+    const data = await resp.json();
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+    // Parse JSON from response (strip markdown fences if present)
+    const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    let translations;
+    try { translations = JSON.parse(cleaned); } catch(e) {
+      return json({ error: 'Failed to parse translation response', raw: text.substring(0, 500) }, 502);
+    }
+    return json({ translations });
+  } catch(err) {
+    console.error('[gis-proxy] translate error:', err.message);
+    return json({ error: err.message }, 502);
+  }
 }
