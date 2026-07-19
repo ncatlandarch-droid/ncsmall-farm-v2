@@ -113,13 +113,14 @@
           h('img', { src: kenji.img, style: { width: '280px', height: '280px', objectFit: 'cover', borderRadius: '50%', border: '6px solid #fff', boxShadow: '0 12px 32px rgba(0,0,0,0.18)' }, className: 'avatar-img' }),
           st.speakingAvatarId === 'kenji' ? renderWaveform(true) : null,
           h('div', {
-            style: { position: 'absolute', bottom: '8px', right: '8px', width: '36px', height: '36px', borderRadius: '50%', background: st.speakingAvatarId === 'kenji' ? 'var(--aggie-gold)' : 'rgba(0,70,132,0.15)', color: st.speakingAvatarId === 'kenji' ? '#fff' : 'var(--aggie-blue)', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #fff', boxShadow: '0 2px 6px rgba(0,0,0,0.15)' }
+            style: { position: 'absolute', bottom: '8px', right: '8px', width: '42px', height: '42px', borderRadius: '50%', background: st.speakingAvatarId === 'kenji' ? 'var(--aggie-gold)' : '#fff', color: st.speakingAvatarId === 'kenji' ? '#fff' : 'var(--aggie-blue)', fontSize: '1.1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '3px solid #fff', boxShadow: '0 3px 10px rgba(0,0,0,0.25)', cursor: 'pointer' }
           }, st.speakingAvatarId === 'kenji' ? h('span', { className: 'material-icons-round' }, 'stop') : (st.voiceOn ? h('span', { className: 'material-icons-round' }, 'volume_up') : h('span', { className: 'material-icons-round' }, 'volume_off')))
         ),
         h('h1', { style: { fontSize: '2.75rem', fontWeight: '900', color: '#fff', letterSpacing: '-0.03em', textAlign: 'center', position: 'relative', zIndex: '2', textShadow: '0 2px 8px rgba(0,0,0,0.3)' } }, 'NCSmall.Farm'),
-        h('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '24px', margin: '0.5rem 0 0.75rem', flexWrap: 'wrap', position: 'relative', zIndex: '2' } },
-          h('img', { src: 'images/sfric-logo-horizontal.png', alt: 'SFRIC — Small Farm Research & Innovation Center', style: { height: '94px', filter: 'brightness(1.1)' } }),
-          h('img', { src: 'images/nc-coop-ext-doublestack.jpg', alt: 'NC Cooperative Extension', style: { height: '78px', filter: 'brightness(1.2)' } })
+        h('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '20px', margin: '0.5rem 0 0.75rem', flexWrap: 'wrap', position: 'relative', zIndex: '2', background: 'rgba(255,255,255,0.92)', borderRadius: '16px', padding: '12px 28px', boxShadow: '0 4px 16px rgba(0,0,0,0.15)' } },
+          h('img', { src: 'images/sfric-logo-horizontal.png', alt: 'SFRIC — Small Farm Research & Innovation Center', style: { height: '80px' } }),
+          h('div', { style: { width: '2px', height: '50px', background: 'rgba(0,70,132,0.15)', borderRadius: '1px' } }),
+          h('img', { src: 'images/nc-coop-ext-doublestack.jpg', alt: 'NC Cooperative Extension', style: { height: '66px' } })
         ),
         h('p', { style: { fontSize: '1.1rem', lineHeight: '1.7', color: 'rgba(255,255,255,0.85)', maxWidth: '520px', textAlign: 'center', margin: '0 auto 1rem', position: 'relative', zIndex: '2' } },
           'How can we help you today? Ask me anything about agriculture, nutrition, community resources, or upcoming events.'
