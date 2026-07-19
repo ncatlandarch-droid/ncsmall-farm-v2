@@ -100,10 +100,10 @@
             style: { position: 'absolute', bottom: '8px', right: '8px', width: '36px', height: '36px', borderRadius: '50%', background: st.speakingAvatarId === 'kenji' ? 'var(--aggie-gold)' : 'rgba(0,70,132,0.15)', color: st.speakingAvatarId === 'kenji' ? '#fff' : 'var(--aggie-blue)', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #fff', boxShadow: '0 2px 6px rgba(0,0,0,0.15)' }
           }, st.speakingAvatarId === 'kenji' ? h('span', { className: 'material-icons-round' }, 'stop') : (st.voiceOn ? h('span', { className: 'material-icons-round' }, 'volume_up') : h('span', { className: 'material-icons-round' }, 'volume_off')))
         ),
-        h('h1', { style: { fontSize: '2.2rem', fontWeight: '900', color: 'var(--aggie-blue)', letterSpacing: '-0.03em', textAlign: 'center' } }, 'NCSmall.Farm'),
+        h('h1', { style: { fontSize: '2.75rem', fontWeight: '900', color: 'var(--aggie-blue)', letterSpacing: '-0.03em', textAlign: 'center' } }, 'NCSmall.Farm'),
         h('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '24px', margin: '0.5rem 0 0.75rem', flexWrap: 'wrap' } },
-          h('img', { src: 'images/sfric-logo-horizontal.png', alt: 'SFRIC — Small Farm Research & Innovation Center', style: { height: '75px' } }),
-          h('img', { src: 'images/nc-coop-ext-doublestack.jpg', alt: 'NC Cooperative Extension', style: { height: '63px', opacity: 0.85 } })
+          h('img', { src: 'images/sfric-logo-horizontal.png', alt: 'SFRIC — Small Farm Research & Innovation Center', style: { height: '94px' } }),
+          h('img', { src: 'images/nc-coop-ext-doublestack.jpg', alt: 'NC Cooperative Extension', style: { height: '78px', opacity: 0.85 } })
         ),
         h('p', { style: { fontSize: '1.1rem', lineHeight: '1.7', color: 'var(--text-secondary)', maxWidth: '520px', textAlign: 'center', margin: '0 auto 1rem' } },
           'How can we help you today? Ask me anything about agriculture, nutrition, community resources, or upcoming events.'
