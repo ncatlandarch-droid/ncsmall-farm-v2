@@ -27,9 +27,9 @@
 
   /* ── Farm Classification from land use ────────────────────── */
   const FARM_CLASS = {
-    'confirmed-farm':   { color: '#2E7D32', fill: 'rgba(46,125,50,0.18)',  label: 'Confirmed Farm' },
-    'likely-farm':      { color: '#4CAF50', fill: 'rgba(76,175,80,0.15)',  label: 'Likely Farm' },
-    'potential-farm':   { color: '#FFC107', fill: 'rgba(255,193,7,0.15)',  label: 'Potential Farm' },
+    'confirmed-farm':   { color: '#1B5E20', fill: 'rgba(27,94,32,0.22)',   label: 'Confirmed Farm' },
+    'likely-farm':      { color: '#00838F', fill: 'rgba(0,131,143,0.18)',  label: 'Likely Farm' },
+    'potential-farm':   { color: '#E65100', fill: 'rgba(230,81,0,0.18)',   label: 'Potential Farm' },
     'non-agricultural': { color: '#78909C', fill: 'rgba(120,144,156,0.08)', label: 'Non-Agricultural' }
   };
 
@@ -170,9 +170,9 @@
             secTitle('Farm Classification'),
             h('div', { style: { fontSize: '9px', color: '#64748b', marginBottom: '8px', lineHeight: '1.4' } }, 'NC § 160D-903 · Guilford County UDO'),
             farmFilterBtn('ALL', 'All Parcels', '#f8fafc', '—'),
-            farmFilterBtn('confirmed-farm', 'Confirmed Farm', '#2E7D32', '—'),
-            farmFilterBtn('likely-farm', 'Likely Farm', '#4CAF50', '—'),
-            farmFilterBtn('potential-farm', 'Potential Farm', '#FFC107', '—'),
+            farmFilterBtn('confirmed-farm', 'Confirmed Farm', '#1B5E20', '—'),
+            farmFilterBtn('likely-farm', 'Likely Farm', '#00838F', '—'),
+            farmFilterBtn('potential-farm', 'Potential Farm', '#E65100', '—'),
             farmFilterBtn('non-agricultural', 'Non-Agricultural', '#78909C', '—'),
             divider(),
             secTitle('Identification Criteria'),
@@ -463,11 +463,34 @@
         // Build label field for tooltips
         gisLayers[name] = L.geoJSON(data, {
           style: function(feature) {
+            var fillColor = config.color;
+            var p = feature.properties || {};
+
+            // Soils: color by drainage class
+            if (name === 'Soils (SSURGO)' && p.drclassdcd) {
+              var dc = (p.drclassdcd || '').toLowerCase();
+              if (dc.indexOf('excessively') >= 0)          fillColor = '#E8D44D'; // yellow — drains fast
+              else if (dc.indexOf('well') >= 0 && dc.indexOf('poor') < 0 && dc.indexOf('moderate') < 0) fillColor = '#43A047'; // green — ideal
+              else if (dc.indexOf('moderately well') >= 0) fillColor = '#66BB6A'; // light green
+              else if (dc.indexOf('somewhat poorly') >= 0) fillColor = '#4FC3F7'; // light blue
+              else if (dc.indexOf('poorly') >= 0 && dc.indexOf('very') < 0) fillColor = '#0288D1'; // blue
+              else if (dc.indexOf('very poorly') >= 0)     fillColor = '#7B1FA2'; // purple — wetland
+              else fillColor = '#90A4AE'; // gray — unknown
+            } else if (name === 'Soils (SSURGO)' && p.hydgrpdcd) {
+              // Fallback: color by hydrologic group
+              var hg = (p.hydgrpdcd || '').toUpperCase();
+              if (hg === 'A')      fillColor = '#43A047'; // well drained
+              else if (hg === 'B') fillColor = '#66BB6A';
+              else if (hg === 'C') fillColor = '#FFA726'; // moderate runoff
+              else if (hg === 'D') fillColor = '#0288D1'; // high runoff
+              else                 fillColor = '#90A4AE';
+            }
+
             return {
-              color: config.color,
+              color: name === 'Soils (SSURGO)' ? 'rgba(0,0,0,0.3)' : config.color,
               weight: config.weight,
-              fillColor: config.color,
-              fillOpacity: config.fillOpacity,
+              fillColor: fillColor,
+              fillOpacity: name === 'Soils (SSURGO)' ? 0.55 : config.fillOpacity,
               opacity: 0.7
             };
           },
@@ -493,8 +516,10 @@
     var html = '<div style="font-family:Inter,sans-serif;min-width:140px;font-size:11px;">';
     switch(layerName) {
       case 'Soils (SSURGO)':
-        html += '<b style="color:#4CAF50;">' + (p.musym || p.MUSYM || p.muname || 'Soil Unit') + '</b>';
+        html += '<b style="color:#2E7D32;">' + (p.musym || p.MUSYM || p.muname || 'Soil Unit') + '</b>';
         if (p.muname || p.MUNAME) html += '<br>' + (p.muname || p.MUNAME);
+        if (p.drclassdcd) html += '<br><span style="color:#1565C0;">Drainage: ' + p.drclassdcd + '</span>';
+        if (p.hydgrpdcd) html += '<br>Hydro Group: ' + p.hydgrpdcd;
         break;
       case 'Zoning':
         html += '<b style="color:#AB47BC;">' + (p.ZONE_DESC || p.ZONING || p.zone || p.Zone || p.ZONE || p.zonedesc || 'Zone') + '</b>';

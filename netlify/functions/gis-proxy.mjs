@@ -38,9 +38,8 @@ export default async (request) => {
   if (parts.length !== 4 || parts.some(isNaN)) return json({ error: 'Invalid bbox' }, 400);
   const [west, south, east, north] = parts;
 
-  // Parcels have their own 500-record cap; skip bbox limit for them.
-  // Other GIS layers still need the bbox limit to avoid huge responses.
-  if (service !== 'parcels' && service !== 'farms' && ((east - west) > MAX_BBOX_DEG || (north - south) > MAX_BBOX_DEG)) {
+  // Parcels/farms/soils have their own caps; skip bbox limit for them.
+  if (service !== 'parcels' && service !== 'farms' && service !== 'soils' && ((east - west) > MAX_BBOX_DEG || (north - south) > MAX_BBOX_DEG)) {
     return json({ error: 'bbox_too_large', message: 'Zoom in to load GIS data' }, 400);
   }
 
@@ -509,9 +508,9 @@ async function fetchSoils(w, s, e, n) {
                    `<Box srsName='EPSG:4326'><coordinates>${w},${s} ${e},${n}</coordinates></Box></BBOX></Filter>`;
     const wfsUrl = `https://SDMDataAccess.sc.egov.usda.gov/Spatial/SDMWGS84Geographic.wfs` +
                    `?SERVICE=WFS&VERSION=1.1.0&REQUEST=GetFeature&TYPENAME=MapunitPoly` +
-                   `&FILTER=${encodeURIComponent(filter)}&SRSNAME=EPSG:4326&OUTPUTFORMAT=GML2&MAXFEATURES=200`;
+                   `&FILTER=${encodeURIComponent(filter)}&SRSNAME=EPSG:4326&OUTPUTFORMAT=GML2&MAXFEATURES=2000`;
 
-    const resp = await fetch(wfsUrl, { signal: AbortSignal.timeout(14000) });
+    const resp = await fetch(wfsUrl, { signal: AbortSignal.timeout(25000) });
     if (!resp.ok) throw new Error(`SDA WFS HTTP ${resp.status}`);
     const gml  = await resp.text();
     if (!gml.includes('<gml:featureMember>')) throw new Error('No features in GML response');
