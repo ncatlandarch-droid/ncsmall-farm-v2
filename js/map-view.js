@@ -363,7 +363,15 @@
       onclick: function() {
         activeClassFilter = (activeClassFilter === key) ? 'ALL' : key;
         applyClassFilter();
-        window.render();
+        // Update button visuals without full re-render (which kills popups)
+        document.querySelectorAll('[data-farm-class]').forEach(function(btn) {
+          var k = btn.getAttribute('data-farm-class');
+          var active = (k === activeClassFilter);
+          btn.style.background = active ? 'rgba(255,255,255,0.1)' : 'transparent';
+          btn.style.borderLeft = active ? '3px solid currentColor' : '3px solid transparent';
+          var lbl = btn.querySelector('span:nth-child(1) > span:nth-child(2)');
+          if (lbl) { lbl.style.fontWeight = active ? '700' : '500'; lbl.style.color = active ? '#f8fafc' : '#94a3b8'; }
+        });
       },
       onmouseenter: function() { if (!isActive) this.style.background = 'rgba(255,255,255,0.05)'; },
       onmouseleave: function() { if (!isActive) this.style.background = 'transparent'; }
@@ -683,6 +691,8 @@
     // Debounced parcel fetch — prevents glitchy rapid re-fetches during pan/zoom
     var fetchDebounceTimer = null;
     mapInstance.on('moveend', function() {
+      // Don't re-fetch parcels while a popup is open (autoPan triggers moveend)
+      if (mapInstance._popup && mapInstance._popup.isOpen && mapInstance._popup.isOpen()) return;
       clearTimeout(fetchDebounceTimer);
       fetchDebounceTimer = setTimeout(fetchRealParcels, 300);
     });
@@ -1004,7 +1014,17 @@
           + '<button onclick="window.openIntakeForm(\'' + pin + '\', \'' + safeOwner + '\', \'' + safeAddr + '\', \'' + acres + '\')" style="width:100%;padding:10px;background:#3B7A57;color:white;border:none;border-radius:8px;font-weight:800;font-size:12px;cursor:pointer;font-family:Inter,sans-serif;box-shadow:0 4px 12px rgba(59,122,87,0.3);">🌱 This Is My Farm — Start Assessment</button>'
           + '</div>';
           
-        layer.bindPopup(popupContent, { maxWidth: 340, maxHeight: 480, autoPan: true, autoPanPadding: [80, 80], autoPanPaddingTopLeft: [80, 120], autoPanPaddingBottomRight: [80, 40], keepInView: true, className: 'ncsmall-popup' });
+        layer.bindPopup(popupContent, {
+          maxWidth: 340,
+          maxHeight: 600,
+          autoPan: true,
+          autoPanPadding: [60, 60],
+          autoPanPaddingTopLeft: [60, 140],
+          autoPanPaddingBottomRight: [60, 60],
+          keepInView: false,
+          closeOnClick: false,
+          className: 'ncsmall-popup'
+        });
 
         layer.on('popupopen', function() {
            if (pin) fetchEnrichedTaxData(pin, acres, landUse);
