@@ -345,6 +345,49 @@
     'Elevation (DEM)':       { service: 'contours',   color: '#66BB6A', fillOpacity: 0,    weight: 1.5 }
   };
 
+  // Earth Engine tile layers (slope, aspect)
+  var EE_TILE_CONFIG = {
+    'Slope Analysis': { layer: 'slope',  opacity: 0.6 },
+    'Sun Exposure':   { layer: 'aspect', opacity: 0.6 }
+  };
+  var eeTileLayers = {}; // name → L.tileLayer
+  var eeTileLoading = {};
+
+  function toggleEETileLayer(name, show) {
+    var config = EE_TILE_CONFIG[name];
+    if (!config) return;
+    if (!show) {
+      if (eeTileLayers[name]) { mapInstance.removeLayer(eeTileLayers[name]); }
+      return;
+    }
+    if (eeTileLayers[name]) { eeTileLayers[name].addTo(mapInstance); return; }
+    if (eeTileLoading[name]) return;
+
+    eeTileLoading[name] = true;
+    showToast('Loading ' + name + ' (Earth Engine)...', 'info');
+
+    var bounds = mapInstance.getBounds();
+    var bbox = bounds.getWest().toFixed(6) + ',' + bounds.getSouth().toFixed(6) + ',' + bounds.getEast().toFixed(6) + ',' + bounds.getNorth().toFixed(6);
+
+    fetch('/.netlify/functions/ee-proxy?layer=' + config.layer + '&bbox=' + bbox)
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        eeTileLoading[name] = false;
+        if (data.error) {
+          showToast(name + ': ' + (data.message || data.error), 'warn');
+          return;
+        }
+        if (data.tileUrl) {
+          eeTileLayers[name] = L.tileLayer(data.tileUrl, { opacity: config.opacity, maxZoom: 18 }).addTo(mapInstance);
+          showToast(name + ' loaded', 'success');
+        }
+      })
+      .catch(function(err) {
+        eeTileLoading[name] = false;
+        showToast(name + ' failed — ' + err.message, 'warn');
+      });
+  }
+
   function toggleLayer(name, show) {
     if (!mapInstance) return;
     switch(name) {
@@ -361,9 +404,12 @@
         if (!show && farmPinsLayer) { mapInstance.removeLayer(farmPinsLayer); }
         break;
       default:
-        // Check if it's a real GIS layer
+        // Check if it's a real GIS layer (GeoJSON)
         if (GIS_LAYER_CONFIG[name]) {
           toggleGISLayer(name, show);
+        // Check if it's an Earth Engine tile layer
+        } else if (EE_TILE_CONFIG[name]) {
+          toggleEETileLayer(name, show);
         } else {
           showToast(name + ' — coming soon', 'info');
         }

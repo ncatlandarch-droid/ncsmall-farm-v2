@@ -102,8 +102,8 @@
         ),
         h('h1', { style: { fontSize: '2.2rem', fontWeight: '900', color: 'var(--aggie-blue)', letterSpacing: '-0.03em', textAlign: 'center' } }, 'NCSmall.Farm'),
         h('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '24px', margin: '0.5rem 0 0.75rem', flexWrap: 'wrap' } },
-          h('img', { src: 'images/sfric-logo-horizontal.png', alt: 'SFRIC — Small Farm Research & Innovation Center', style: { height: '60px' } }),
-          h('img', { src: 'images/nc-coop-ext-doublestack.jpg', alt: 'NC Cooperative Extension', style: { height: '50px', opacity: 0.85 } })
+          h('img', { src: 'images/sfric-logo-horizontal.png', alt: 'SFRIC — Small Farm Research & Innovation Center', style: { height: '75px' } }),
+          h('img', { src: 'images/nc-coop-ext-doublestack.jpg', alt: 'NC Cooperative Extension', style: { height: '63px', opacity: 0.85 } })
         ),
         h('p', { style: { fontSize: '1.1rem', lineHeight: '1.7', color: 'var(--text-secondary)', maxWidth: '520px', textAlign: 'center', margin: '0 auto 1rem' } },
           'How can we help you today? Ask me anything about agriculture, nutrition, community resources, or upcoming events.'
