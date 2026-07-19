@@ -93,25 +93,7 @@
         )
       ),
 
-      // ── Dashboard Banner ──
-      h('div', { id: 'farm-dashboard-banner', className: 'farm-dashboard-banner', style: { top: '56px' } },
-        h('div', { className: 'dashboard-stat' },
-          h('div', { id: 'dash-farm-count', className: 'stat-value' }, '—'),
-          h('div', { className: 'stat-label' }, 'Farm Parcels')
-        ),
-        h('div', { className: 'dashboard-stat' },
-          h('div', { id: 'dash-total-acres', className: 'stat-value' }, '—'),
-          h('div', { className: 'stat-label' }, 'Total Acres')
-        ),
-        h('div', { className: 'dashboard-stat' },
-          h('div', { id: 'dash-avg-size', className: 'stat-value' }, '—'),
-          h('div', { className: 'stat-label' }, 'Avg Farm Size')
-        ),
-        h('div', { className: 'dashboard-stat' },
-          h('div', { id: 'dash-county', className: 'stat-value', style: { color: '#FDB927', fontSize: '14px' } }, 'Guilford'),
-          h('div', { className: 'stat-label' }, 'County')
-        )
-      ),
+
 
       // ── Left: Farm Directory Toggle Button ──
       h('button', {
@@ -133,7 +115,22 @@
               style: { background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', padding: '4px' }
             }, h('span', { className: 'material-icons-round', style: { fontSize: '18px' } }, 'close'))
           ),
-          h('div', { id: 'directory-summary', style: { fontSize: '10px', color: '#4CAF50', fontWeight: '600', marginTop: '4px' } }, 'Loading farms...'),
+          h('div', { id: 'directory-farm-stats', style: { display: 'flex', gap: '12px', marginTop: '6px', padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.06)' } },
+            h('div', { style: { display: 'flex', alignItems: 'center', gap: '4px' } },
+              h('span', { className: 'material-icons-round', style: { fontSize: '13px', color: '#4CAF50' } }, 'agriculture'),
+              h('span', { id: 'dash-farm-count', style: { fontSize: '12px', fontWeight: '800', color: '#4CAF50' } }, '—'),
+              h('span', { style: { fontSize: '9px', color: '#94a3b8' } }, 'farms')
+            ),
+            h('div', { style: { display: 'flex', alignItems: 'center', gap: '4px' } },
+              h('span', { className: 'material-icons-round', style: { fontSize: '13px', color: '#FDB927' } }, 'straighten'),
+              h('span', { id: 'dash-total-acres', style: { fontSize: '12px', fontWeight: '800', color: '#FDB927' } }, '—'),
+              h('span', { style: { fontSize: '9px', color: '#94a3b8' } }, 'acres')
+            ),
+            h('div', { style: { display: 'flex', alignItems: 'center', gap: '4px' } },
+              h('span', { style: { fontSize: '9px', color: '#64748b' } }, 'avg'),
+              h('span', { id: 'dash-avg-size', style: { fontSize: '11px', fontWeight: '700', color: '#cbd5e1' } }, '—')
+            )
+          ),
           h('div', { className: 'farm-directory-search', style: { marginTop: '8px' } },
             h('span', { className: 'material-icons-round', style: { padding: '6px 8px', color: '#64748b', fontSize: '16px' } }, 'search'),
             h('input', {
@@ -187,14 +184,7 @@
         )
       ),
 
-      // ── Bottom Left: Portfolio Stats ──
-      h('div', { style: { position: 'absolute', bottom: '20px', left: '12px', zIndex: '1000', maxWidth: '320px' } },
-        panel(
-          secTitle('Real-Time Data'),
-          h('div', { id: 'real-parcel-count-label', style: { fontSize: '12px', fontWeight: '800', color: '#f8fafc', padding: '6px 0' } }, 'Loading farm data...'),
-          h('div', { style: { fontSize: '10px', color: '#94a3b8', lineHeight: '1.4' } }, 'Zoom in and click any parcel to load enriched tax and assessment data.')
-        )
-      ),
+
 
       // Intake Form Modal (hidden by default)
       h('div', { id: 'farmer-intake-modal', style: { display: 'none', position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', zIndex: '9999', justifyContent: 'center', alignItems: 'center' } },
@@ -589,11 +579,7 @@
         updateDashboardBanner();
         renderDirectoryList();
         
-        // Update bottom status with TOTAL farm data
-        var el = document.getElementById('real-parcel-count-label');
-        if (el) {
-          el.innerHTML = 'Farm Parcels: <b style="color:#4CAF50">' + totalDynamicFarmCount.toLocaleString() + '</b> · <b style="color:#4CAF50">' + Math.round(totalDynamicFarmAcres).toLocaleString() + ' ac</b>';
-        }
+
       })
       .catch(function(err) {
         console.warn('[NCSmall Map] Farm discovery failed:', err.message);
@@ -697,9 +683,6 @@
         showToast('Zoom in to load parcel boundaries', 'info');
         lastZoomToast = Date.now();
       }
-      if(document.getElementById('real-parcel-count-label')) {
-        document.getElementById('real-parcel-count-label').innerText = 'Parcels in View: 0';
-      }
       return;
     }
 
@@ -729,9 +712,6 @@
           return;
         }
         totalRealParcelsInView = geojson.features.length;
-        if(document.getElementById('real-parcel-count-label')) {
-          document.getElementById('real-parcel-count-label').innerText = 'Parcels in View: ' + totalRealParcelsInView;
-        }
         renderParcelGeoJSON(geojson);
         showToast(geojson.features.length + ' parcels loaded', 'success');
       })
@@ -889,13 +869,6 @@
         countEl.textContent = String(counts[cls]);
       }
     });
-    // Update bottom panel
-    var label = document.getElementById('real-parcel-count-label');
-    if (label) {
-      var total = Object.values(counts).reduce(function(a,b) { return a+b; }, 0);
-      var farmCount = (counts['confirmed-farm'] || 0) + (counts['likely-farm'] || 0);
-      label.innerHTML = 'Parcels: <b>' + total + '</b> · Farms: <b style="color:#4CAF50">' + farmCount + '</b> · <b style="color:#4CAF50">' + Math.round(farmAcres).toLocaleString() + ' ac</b>';
-    }
   }
 
   const EQIP_PRACTICES = {

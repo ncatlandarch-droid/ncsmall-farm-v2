@@ -1,425 +1,895 @@
-window.renderESPDashboard = function() {
-  const h = window.h;
+/* ==========================================================================
+   NC Small Farm Platform V.2 — ESP Dashboard (Full 10‑Step)
+   Admin-only Environmental Scanning Process dashboard
+   NC Cooperative Extension · Guilford County
+   ========================================================================== */
 
-  // Initialize state
-  const st = window._espState || (window._espState = {
+window.renderESPDashboard = function () {
+  var h = window.h;
+
+  // ── Local ESP State ──────────────────────────────────────────────────────
+  var espState = window._espState || (window._espState = {
     currentStep: 1,
     county: 'Guilford',
     issues: [],
     stakeholderResponses: [],
     citizenResponses: [],
     priorities: [],
-    assets: []
+    assets: [],
+    completedSteps: [],
+    auditChecks: {}
   });
 
-  // Global styles
-  const theme = {
-    bgDark: 'rgba(10,14,23,0.9)',
-    cardBg: 'rgba(255,255,255,0.04)',
-    cardBorder: '1px solid rgba(255,255,255,0.08)',
-    primary: '#3B7A57',
-    gold: '#FDB927',
-    blue: '#004684',
-    textLight: '#ffffff',
-    textMuted: 'rgba(255,255,255,0.6)',
-    fontFamily: '"Inter", sans-serif'
-  };
+  // ── Theme Tokens ─────────────────────────────────────────────────────────
+  var GOLD   = '#FDB927';
+  var GREEN  = '#3B7A57';
+  var BLUE   = '#004684';
+  var BG_CARD = 'rgba(255,255,255,0.04)';
+  var BORDER  = 'rgba(255,255,255,0.08)';
+  var GLASS   = 'rgba(10,14,23,0.92)';
+  var GLASS_BORDER = 'rgba(255,255,255,0.10)';
+  var TEXT    = '#f8fafc';
+  var TEXT2   = '#cbd5e1';
+  var TEXT3   = '#94a3b8';
+  var RADIUS  = '12px';
+  var FONT   = 'Inter, sans-serif';
 
-  const cardStyle = `background: ${theme.cardBg}; border: ${theme.cardBorder}; border-radius: 12px; padding: 20px; backdrop-filter: blur(16px);`;
-  const inputStyle = `background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); color: white; padding: 10px 14px; border-radius: 8px; width: 100%; font-family: ${theme.fontFamily};`;
-  const btnPrimaryStyle = `background: ${theme.primary}; color: white; border: none; padding: 10px 20px; border-radius: 8px; font-weight: 600; cursor: pointer; transition: 0.2s; font-family: ${theme.fontFamily};`;
-  const btnGoldStyle = `background: ${theme.gold}; color: #111; border: none; padding: 10px 20px; border-radius: 8px; font-weight: 600; cursor: pointer; transition: 0.2s; font-family: ${theme.fontFamily};`;
-
-  // Root container
-  const container = h('div', {
-    className: 'esp-dashboard',
-    style: `display: flex; flex-direction: column; gap: 24px; padding: 24px; color: ${theme.textLight}; font-family: ${theme.fontFamily}; min-height: 100vh;`
-  });
-
-  // Main render loop
-  function render() {
-    container.innerHTML = '';
-
-    // Header
-    const progressPercent = (st.currentStep / 10) * 100;
-    const header = h('div', { style: 'display: flex; flex-direction: column; gap: 12px;' },
-      h('div', { style: 'display: flex; justify-content: space-between; align-items: center;' },
-        h('h1', { style: 'margin: 0; font-size: 24px; font-weight: 700;' }, `Environmental Scanning Dashboard — ${st.county} County`),
-        h('div', { style: `color: ${theme.gold}; font-weight: 600;` }, `Step ${st.currentStep} of 10`)
-      ),
-      h('div', { style: `height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden;` },
-        h('div', { style: `height: 100%; width: ${progressPercent}%; background: ${theme.gold}; transition: width 0.3s ease;` })
-      )
-    );
-
-    // Step Navigator
-    const steps = [
-      'Situational Analysis', 'Key Issues', 'Stakeholder Input', 'County Mapping',
-      'Citizen Data Collection', 'Triangulation', 'Asset Mapping', 'Priority Dashboard',
-      'Executive Dashboard', 'Database & ERP'
-    ];
-
-    const navigator = h('div', { style: 'display: flex; gap: 10px; overflow-x: auto; padding-bottom: 10px;' },
-      ...steps.map((name, idx) => {
-        const stepNum = idx + 1;
-        const isActive = st.currentStep === stepNum;
-        const isCompleted = stepNum < st.currentStep;
-        
-        let bg = 'rgba(255,255,255,0.05)';
-        let color = theme.textMuted;
-        let border = '1px solid transparent';
-        
-        if (isActive) {
-          bg = theme.gold;
-          color = '#111';
-        } else if (isCompleted) {
-          bg = 'rgba(59, 122, 87, 0.2)';
-          color = theme.primary;
-          border = `1px solid ${theme.primary}`;
-        }
-
-        return h('button', {
-          style: `white-space: nowrap; padding: 8px 16px; border-radius: 20px; font-size: 14px; font-weight: 600; background: ${bg}; color: ${color}; border: ${border}; cursor: pointer; transition: 0.2s;`,
-          onclick: () => { st.currentStep = stepNum; render(); }
-        }, 
-        isCompleted && !isActive ? h('span', { style: 'margin-right: 6px;' }, '✓ ') : null,
-        `${stepNum}. ${name}`);
-      })
-    );
-
-    // Step Content Wrapper
-    const contentArea = h('div', { style: 'flex-grow: 1;' });
-
-    // Render logic per step
-    switch (st.currentStep) {
-      case 1: contentArea.appendChild(renderStep1()); break;
-      case 2: contentArea.appendChild(renderStep2()); break;
-      case 3: contentArea.appendChild(renderStep3()); break;
-      case 4: contentArea.appendChild(renderStep4()); break;
-      case 5: contentArea.appendChild(renderStep5()); break;
-      case 6: contentArea.appendChild(renderStep6()); break;
-      case 7: contentArea.appendChild(renderStep7()); break;
-      case 8: contentArea.appendChild(renderStep8()); break;
-      case 9: contentArea.appendChild(renderStep9()); break;
-      case 10: contentArea.appendChild(renderStep10()); break;
-    }
-
-    container.appendChild(header);
-    container.appendChild(navigator);
-    container.appendChild(contentArea);
+  // ── Helpers ──────────────────────────────────────────────────────────────
+  function icon(name, extra) {
+    return h('span', Object.assign({ className: 'material-icons-round', style: { fontSize: '20px', verticalAlign: 'middle' } }, extra || {}), name);
   }
 
   function showToast(msg) {
-    const toast = h('div', {
-      style: `position: fixed; bottom: 20px; right: 20px; background: ${theme.primary}; color: white; padding: 12px 24px; border-radius: 8px; font-weight: 500; box-shadow: 0 4px 12px rgba(0,0,0,0.3); z-index: 9999; animation: fadeInOut 3s forwards;`
-    }, msg);
-    
-    if (!document.getElementById('toast-styles')) {
-      const style = document.createElement('style');
-      style.id = 'toast-styles';
-      style.innerHTML = `@keyframes fadeInOut { 0% { opacity: 0; transform: translateY(10px); } 10% { opacity: 1; transform: translateY(0); } 90% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(10px); } }`;
-      document.head.appendChild(style);
-    }
-    
-    document.body.appendChild(toast);
-    setTimeout(() => toast.remove(), 3000);
+    var t = document.createElement('div');
+    Object.assign(t.style, {
+      position: 'fixed', bottom: '32px', left: '50%', transform: 'translateX(-50%)',
+      background: GREEN, color: '#fff', padding: '12px 28px', borderRadius: '10px',
+      fontFamily: FONT, fontSize: '14px', fontWeight: '600', zIndex: '9999',
+      boxShadow: '0 8px 32px rgba(0,0,0,0.5)', opacity: '0', transition: 'opacity 0.3s'
+    });
+    t.textContent = msg;
+    document.body.appendChild(t);
+    requestAnimationFrame(function () { t.style.opacity = '1'; });
+    setTimeout(function () {
+      t.style.opacity = '0';
+      setTimeout(function () { t.remove(); }, 350);
+    }, 2600);
   }
 
-  // ==== STEP RENDERERS ====
+  function goStep(n) {
+    espState.currentStep = n;
+    window.render();
+  }
 
-  function renderStep1() {
-    const categories = ['Demographics', 'Economic', 'Health/Social', 'Education', 'Agriculture', 'Environmental', 'Opportunity'];
-    
-    const thStyle = `text-align: left; padding: 12px; border-bottom: 1px solid rgba(255,255,255,0.1); color: ${theme.textMuted}; font-weight: 500;`;
-    const tdStyle = `padding: 12px; border-bottom: 1px solid rgba(255,255,255,0.05);`;
+  function markComplete(n) {
+    if (espState.completedSteps.indexOf(n) === -1) espState.completedSteps.push(n);
+  }
 
-    const table = h('table', { style: 'width: 100%; border-collapse: collapse; margin-top: 16px;' },
-      h('thead', {}, 
-        h('tr', {},
-          h('th', { style: thStyle }, 'Data Category'),
-          h('th', { style: thStyle }, 'Source'),
-          h('th', { style: thStyle }, 'State Average'),
-          h('th', { style: thStyle }, 'My County'),
-          h('th', { style: thStyle }, 'Neighbor 1'),
-          h('th', { style: thStyle }, 'Neighbor 2')
-        )
-      ),
-      h('tbody', {},
-        ...categories.map(cat => h('tr', {},
-          h('td', { style: `${tdStyle} font-weight: 600; color: ${theme.gold};` }, cat),
-          h('td', { style: tdStyle }, 'US Census / NASS'),
-          h('td', { style: tdStyle }, '—'),
-          h('td', { style: tdStyle }, '—'),
-          h('td', { style: tdStyle }, '—'),
-          h('td', { style: tdStyle }, '—')
-        ))
+  // ── Shared Styles ────────────────────────────────────────────────────────
+  var cardStyle = {
+    background: BG_CARD, border: '1px solid ' + BORDER, borderRadius: RADIUS,
+    padding: '24px', marginBottom: '16px'
+  };
+
+  var inputStyle = {
+    width: '100%', padding: '10px 14px', borderRadius: '8px', fontSize: '14px',
+    fontFamily: FONT, border: '1px solid rgba(255,255,255,0.15)',
+    background: 'rgba(255,255,255,0.06)', color: TEXT, outline: 'none',
+    boxSizing: 'border-box'
+  };
+
+  var btnPrimary = {
+    padding: '10px 24px', borderRadius: '8px', border: 'none', cursor: 'pointer',
+    fontWeight: '700', fontSize: '14px', fontFamily: FONT,
+    background: GREEN, color: '#fff', transition: 'all 0.2s'
+  };
+
+  var btnGold = {
+    padding: '10px 24px', borderRadius: '8px', border: 'none', cursor: 'pointer',
+    fontWeight: '700', fontSize: '14px', fontFamily: FONT,
+    background: GOLD, color: '#0a0e17', transition: 'all 0.2s'
+  };
+
+  var btnOutline = {
+    padding: '10px 24px', borderRadius: '8px', cursor: 'pointer',
+    fontWeight: '600', fontSize: '14px', fontFamily: FONT,
+    background: 'transparent', color: TEXT2, border: '1px solid ' + BORDER,
+    transition: 'all 0.2s'
+  };
+
+  function sectionLabel(txt) {
+    return h('p', { style: { fontSize: '13px', color: TEXT3, fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '16px' } }, txt);
+  }
+
+  // ── Step Meta ────────────────────────────────────────────────────────────
+  var STEPS = [
+    { num: 1,  title: 'Situational Analysis',     icon: 'analytics' },
+    { num: 2,  title: 'Key Issues',               icon: 'report_problem' },
+    { num: 3,  title: 'Stakeholder Input',         icon: 'groups' },
+    { num: 4,  title: 'County Mapping',            icon: 'map' },
+    { num: 5,  title: 'Citizen Data Collection',   icon: 'ballot' },
+    { num: 6,  title: 'Triangulation',             icon: 'hub' },
+    { num: 7,  title: 'Asset Mapping',             icon: 'location_city' },
+    { num: 8,  title: 'Priority Dashboard',        icon: 'leaderboard' },
+    { num: 9,  title: 'Executive Dashboard',       icon: 'dashboard' },
+    { num: 10, title: 'Database & ERP',            icon: 'storage' }
+  ];
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  HEADER — Title + Progress Bar
+  // ══════════════════════════════════════════════════════════════════════════
+  var completePct = Math.round((espState.completedSteps.length / 10) * 100);
+  var header = h('div', { style: { marginBottom: '32px' } },
+    h('div', { style: { display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '6px', flexWrap: 'wrap' } },
+      icon('eco', { style: { fontSize: '32px', color: GREEN } }),
+      h('h1', { style: { fontSize: '1.6rem', fontWeight: '800', color: TEXT, margin: '0', lineHeight: '1.2' } },
+        'Environmental Scanning Dashboard — ' + espState.county + ' County'
       )
-    );
-
-    return h('div', { style: cardStyle },
-      h('div', { style: 'display: flex; justify-content: space-between; align-items: center;' },
-        h('h2', { style: 'margin: 0; font-size: 18px;' }, 'Situational Analysis Data'),
-        h('div', { style: 'display: flex; gap: 12px;' },
-          h('button', { style: btnPrimaryStyle, onclick: () => showToast('API integration coming soon') }, 'Load Census Data'),
-          h('button', { style: btnPrimaryStyle, onclick: () => showToast('API integration coming soon') }, 'Load NASS Data')
-        )
+    ),
+    h('p', { style: { fontSize: '13px', color: TEXT3, margin: '4px 0 16px 0' } },
+      'NC Cooperative Extension · 10‑Step Environmental Scanning Process'
+    ),
+    // Progress bar
+    h('div', { style: { display: 'flex', alignItems: 'center', gap: '12px' } },
+      h('div', { style: { flex: '1', height: '8px', borderRadius: '4px', background: 'rgba(255,255,255,0.08)', overflow: 'hidden' } },
+        h('div', { style: { width: completePct + '%', height: '100%', borderRadius: '4px', background: 'linear-gradient(90deg,' + GREEN + ',' + GOLD + ')', transition: 'width 0.5s ease' } })
       ),
-      table
-    );
-  }
+      h('span', { style: { fontSize: '13px', fontWeight: '700', color: GOLD, minWidth: '50px', textAlign: 'right' } },
+        espState.completedSteps.length + '/10'
+      )
+    )
+  );
 
-  function renderStep2() {
-    const categories = ['Demographics', 'Economic', 'Health', 'Education', 'Agriculture', 'Environmental'];
-    
-    const formRows = Array.from({ length: 5 }).map((_, i) => {
-      return h('div', { style: 'display: flex; gap: 16px; margin-bottom: 16px;' },
-        h('input', { style: `${inputStyle} flex: 2;`, placeholder: `Area of Concern ${i + 1}`, id: `concern-${i}` }),
-        h('select', { style: `${inputStyle} flex: 1;` }, 
-          ...categories.map(c => h('option', { value: c }, c))
-        )
+  // ══════════════════════════════════════════════════════════════════════════
+  //  STEP NAVIGATOR — Horizontal Pills
+  // ══════════════════════════════════════════════════════════════════════════
+  var stepNav = h('div', { style: {
+    display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '8px',
+    marginBottom: '28px', WebkitOverflowScrolling: 'touch'
+  } },
+    STEPS.map(function (s) {
+      var isActive   = espState.currentStep === s.num;
+      var isComplete = espState.completedSteps.indexOf(s.num) !== -1;
+      var pillBg = isActive ? GOLD : isComplete ? GREEN : 'rgba(255,255,255,0.06)';
+      var pillColor = isActive ? '#0a0e17' : isComplete ? '#fff' : TEXT3;
+
+      var pill = h('button', {
+        style: {
+          display: 'flex', alignItems: 'center', gap: '6px',
+          padding: '8px 16px', borderRadius: '24px', border: 'none',
+          background: pillBg, color: pillColor, fontFamily: FONT,
+          fontSize: '12px', fontWeight: '700', cursor: 'pointer',
+          whiteSpace: 'nowrap', transition: 'all 0.25s', flexShrink: '0',
+          boxShadow: isActive ? '0 4px 16px rgba(253,185,39,0.3)' : 'none'
+        },
+        onclick: function () { goStep(s.num); },
+        onmouseenter: function () {
+          if (!isActive) { this.style.background = 'rgba(255,255,255,0.12)'; this.style.color = TEXT; }
+        },
+        onmouseleave: function () {
+          if (!isActive) { this.style.background = pillBg; this.style.color = pillColor; }
+        }
+      },
+        isComplete && !isActive
+          ? icon('check_circle', { style: { fontSize: '16px', color: '#fff' } })
+          : h('span', { style: { fontWeight: '800', fontSize: '13px' } }, String(s.num)),
+        s.title
+      );
+      return pill;
+    })
+  );
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  STEP CONTENT BUILDERS
+  // ══════════════════════════════════════════════════════════════════════════
+
+  // ── Step 1: Situational Analysis ─────────────────────────────────────────
+  function renderStep1() {
+    var categories = [
+      { label: 'Demographics',   source: 'US Census ACS 5‑Year' },
+      { label: 'Economic',       source: 'BLS QCEW / BEA' },
+      { label: 'Health / Social', source: 'County Health Rankings' },
+      { label: 'Education',      source: 'NCES / NC DPI' },
+      { label: 'Agriculture',    source: 'USDA NASS Census' },
+      { label: 'Environmental',  source: 'EPA / NC DEQ' },
+      { label: 'Opportunity',    source: 'USDA ERS Atlas' }
+    ];
+
+    var thStyle = {
+      textAlign: 'left', padding: '10px 12px', fontSize: '11px', fontWeight: '700',
+      textTransform: 'uppercase', letterSpacing: '0.06em', color: TEXT3,
+      borderBottom: '1px solid ' + BORDER, whiteSpace: 'nowrap'
+    };
+    var tdStyle = {
+      padding: '10px 12px', fontSize: '13px', color: TEXT2,
+      borderBottom: '1px solid rgba(255,255,255,0.04)'
+    };
+
+    var thead = h('tr', null,
+      ['Data Category', 'Source', 'State Avg', 'My County', 'Neighbor 1', 'Neighbor 2'].map(function (col) {
+        return h('th', { style: thStyle }, col);
+      })
+    );
+
+    var tbody = categories.map(function (cat, i) {
+      return h('tr', {
+        style: { background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.02)' }
+      },
+        h('td', { style: Object.assign({}, tdStyle, { fontWeight: '600', color: TEXT }) }, cat.label),
+        h('td', { style: tdStyle }, cat.source),
+        h('td', { style: Object.assign({}, tdStyle, { textAlign: 'center' }) }, '—'),
+        h('td', { style: Object.assign({}, tdStyle, { textAlign: 'center', color: GOLD, fontWeight: '700' }) }, '—'),
+        h('td', { style: Object.assign({}, tdStyle, { textAlign: 'center' }) }, '—'),
+        h('td', { style: Object.assign({}, tdStyle, { textAlign: 'center' }) }, '—')
       );
     });
 
-    return h('div', { style: cardStyle },
-      h('h2', { style: 'margin: 0 0 16px 0; font-size: 18px;' }, 'Key Issues Identification'),
-      h('p', { style: `color: ${theme.textMuted}; margin-bottom: 24px;` }, 'Based on your situational analysis, identify the top 5 areas of concern for your county.'),
-      ...formRows,
-      h('button', { 
-        style: `${btnGoldStyle} margin-top: 16px;`, 
-        onclick: () => showToast('Issues saved to state.') 
-      }, 'Save Issues')
+    return h('div', null,
+      h('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' } },
+        icon('analytics', { style: { fontSize: '28px', color: GOLD } }),
+        h('h2', { style: { fontSize: '1.35rem', fontWeight: '800', color: TEXT, margin: '0' } }, 'Step 1 — Situational Analysis')
+      ),
+      sectionLabel('County data comparison matrix'),
+      h('div', { style: { overflowX: 'auto', borderRadius: RADIUS, border: '1px solid ' + BORDER, background: BG_CARD } },
+        h('table', { style: { width: '100%', borderCollapse: 'collapse', minWidth: '650px' } },
+          h('thead', null, thead),
+          h('tbody', null, tbody)
+        )
+      ),
+      h('div', { style: { display: 'flex', gap: '12px', marginTop: '20px', flexWrap: 'wrap' } },
+        h('button', {
+          style: btnPrimary,
+          onclick: function () { showToast('Census data pull initiated — check back in 30s'); }
+        }, icon('download', { style: { fontSize: '16px', marginRight: '6px' } }), 'Load Census Data'),
+        h('button', {
+          style: btnGold,
+          onclick: function () { showToast('USDA NASS Agriculture Census loading…'); }
+        }, icon('agriculture', { style: { fontSize: '16px', marginRight: '6px' } }), 'Load NASS Data'),
+        h('button', {
+          style: btnOutline,
+          onclick: function () { markComplete(1); showToast('Step 1 marked complete ✓'); window.render(); }
+        }, 'Mark Complete')
+      )
     );
   }
 
+  // ── Step 2: Key Issues ───────────────────────────────────────────────────
+  function renderStep2() {
+    var cats = ['Agriculture', 'Economic Development', 'Health & Wellness', 'Youth & Families', 'Environment', 'Food Access', 'Infrastructure'];
+
+    function saveIssues() {
+      var els = document.querySelectorAll('.esp-issue-input');
+      var selects = document.querySelectorAll('.esp-issue-cat');
+      espState.issues = [];
+      els.forEach(function (el, i) {
+        if (el.value.trim()) {
+          espState.issues.push({ text: el.value.trim(), category: selects[i] ? selects[i].value : cats[0] });
+        }
+      });
+      if (espState.issues.length > 0) {
+        markComplete(2);
+        showToast(espState.issues.length + ' issue(s) saved');
+        window.render();
+      } else {
+        showToast('Enter at least one area of concern');
+      }
+    }
+
+    var fields = [];
+    for (var i = 0; i < 5; i++) {
+      (function (idx) {
+        var existing = espState.issues[idx] || { text: '', category: cats[0] };
+        var row = h('div', { style: { display: 'flex', gap: '10px', marginBottom: '12px', flexWrap: 'wrap' } },
+          h('input', {
+            className: 'esp-issue-input', type: 'text', placeholder: 'Area of Concern ' + (idx + 1),
+            value: existing.text,
+            style: Object.assign({}, inputStyle, { flex: '1', minWidth: '200px' }),
+            onfocus: function () { this.style.borderColor = GOLD; },
+            onblur: function () { this.style.borderColor = 'rgba(255,255,255,0.15)'; }
+          }),
+          h('select', {
+            className: 'esp-issue-cat',
+            style: Object.assign({}, inputStyle, { width: 'auto', minWidth: '160px', cursor: 'pointer' })
+          },
+            cats.map(function (c) {
+              return h('option', { value: c, style: { background: '#1a1f2e', color: TEXT } }, c);
+            })
+          )
+        );
+        fields.push(row);
+      })(i);
+    }
+
+    return h('div', null,
+      h('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' } },
+        icon('report_problem', { style: { fontSize: '28px', color: GOLD } }),
+        h('h2', { style: { fontSize: '1.35rem', fontWeight: '800', color: TEXT, margin: '0' } }, 'Step 2 — Key Issues Identification')
+      ),
+      sectionLabel('Identify up to 5 areas of concern from your situational analysis'),
+      h('div', { style: cardStyle }, fields),
+      espState.issues.length > 0
+        ? h('div', { style: Object.assign({}, cardStyle, { marginTop: '4px' }) },
+            sectionLabel('Saved Issues'),
+            espState.issues.map(function (iss, idx) {
+              return h('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' } },
+                h('span', { style: { background: GREEN, color: '#fff', borderRadius: '50%', width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '800', flexShrink: '0' } }, String(idx + 1)),
+                h('span', { style: { color: TEXT, fontSize: '14px', flex: '1' } }, iss.text),
+                h('span', { style: { fontSize: '11px', color: GOLD, fontWeight: '700', background: 'rgba(253,185,39,0.12)', padding: '3px 10px', borderRadius: '12px' } }, iss.category)
+              );
+            })
+          )
+        : null,
+      h('div', { style: { marginTop: '16px' } },
+        h('button', { style: btnPrimary, onclick: saveIssues },
+          icon('save', { style: { fontSize: '16px', marginRight: '6px' } }), 'Save Issues'
+        )
+      )
+    );
+  }
+
+  // ── Step 3: Stakeholder Input ────────────────────────────────────────────
   function renderStep3() {
-    const groups = [
-      'Advisory Leadership Council', 'County Officials', 'Non-profit Leaders', 
-      'Local Business Owners', 'Residents & Property Owners', 'Other'
+    var groups = [
+      { name: 'Elected Officials',     icon: 'gavel',          color: BLUE },
+      { name: 'Business Leaders',      icon: 'business_center', color: '#7c3aed' },
+      { name: 'Faith‑Based Orgs',      icon: 'church',         color: '#db2777' },
+      { name: 'Educators / Schools',   icon: 'school',         color: '#0891b2' },
+      { name: 'Health Professionals',  icon: 'local_hospital', color: '#059669' },
+      { name: 'Agricultural Leaders',  icon: 'agriculture',    color: GOLD }
     ];
 
-    const grid = h('div', { style: 'display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; margin-top: 20px;' },
-      ...groups.map(g => h('div', { style: `${cardStyle} display: flex; flex-direction: column; justify-content: space-between; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.1);` },
-        h('div', { style: 'display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px;' },
-          h('h3', { style: 'margin: 0; font-size: 16px; font-weight: 600;' }, g),
-          h('span', { style: `background: rgba(253, 185, 39, 0.2); color: ${theme.gold}; padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: 700;` }, '0 Responses')
-        ),
-        h('button', { style: btnPrimaryStyle, onclick: () => showToast(`Opening form for ${g}...`) }, '+ Add Response')
-      ))
-    );
+    function getCount(name) {
+      return espState.stakeholderResponses.filter(function (r) { return r.group === name; }).length;
+    }
 
-    return h('div', {},
-      h('h2', { style: 'margin: 0 0 8px 0; font-size: 18px;' }, 'Stakeholder Input'),
-      h('p', { style: `color: ${theme.textMuted}; margin: 0;` }, 'Record qualitative feedback from key county stakeholder groups.'),
-      grid
-    );
-  }
-
-  function renderStep4() {
-    return h('div', { style: cardStyle },
-      h('div', { style: 'text-align: center; padding: 40px 20px;' },
-        h('div', { style: `font-size: 48px; margin-bottom: 16px;` }, '🗺️'),
-        h('h2', { style: 'margin: 0 0 16px 0; font-size: 24px;' }, 'County GIS Mapping'),
-        h('p', { style: `color: ${theme.textMuted}; max-width: 600px; margin: 0 auto 32px auto; line-height: 1.6;` }, 
-          'The county map provides real-time GIS analysis of farm parcels, soils, zoning, flood zones, wetlands, and more. Use this spatial data to validate geographic disparities and opportunities.'
+    var cards = groups.map(function (g) {
+      var count = getCount(g.name);
+      return h('div', {
+        style: Object.assign({}, cardStyle, {
+          textAlign: 'center', padding: '28px 20px', position: 'relative',
+          transition: 'transform 0.2s, border-color 0.2s', cursor: 'default'
+        }),
+        onmouseenter: function () { this.style.transform = 'translateY(-4px)'; this.style.borderColor = g.color; },
+        onmouseleave: function () { this.style.transform = 'none'; this.style.borderColor = BORDER; }
+      },
+        // Badge
+        count > 0
+          ? h('span', { style: {
+              position: 'absolute', top: '10px', right: '10px',
+              background: GREEN, color: '#fff', borderRadius: '50%',
+              width: '26px', height: '26px', display: 'flex',
+              alignItems: 'center', justifyContent: 'center',
+              fontSize: '12px', fontWeight: '800'
+            } }, String(count))
+          : null,
+        h('div', { style: {
+          width: '52px', height: '52px', borderRadius: '50%',
+          background: g.color + '22', display: 'flex',
+          alignItems: 'center', justifyContent: 'center',
+          margin: '0 auto 14px'
+        } },
+          icon(g.icon, { style: { fontSize: '26px', color: g.color } })
         ),
-        h('button', { 
-          style: `${btnGoldStyle} font-size: 16px; padding: 12px 32px;`,
-          onclick: () => {
-            if (window.setView) window.setView('map');
-            else showToast('Map view triggered');
+        h('p', { style: { color: TEXT, fontSize: '14px', fontWeight: '700', margin: '0 0 14px' } }, g.name),
+        h('button', {
+          style: Object.assign({}, btnPrimary, { padding: '8px 18px', fontSize: '12px' }),
+          onclick: function () {
+            espState.stakeholderResponses.push({ group: g.name, date: new Date().toISOString(), notes: '' });
+            if (espState.stakeholderResponses.length >= 3) markComplete(3);
+            showToast('Response added for ' + g.name);
+            window.render();
           }
-        }, 'Open County Map →')
+        }, icon('add', { style: { fontSize: '14px', marginRight: '4px' } }), 'Add Response')
+      );
+    });
+
+    return h('div', null,
+      h('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' } },
+        icon('groups', { style: { fontSize: '28px', color: GOLD } }),
+        h('h2', { style: { fontSize: '1.35rem', fontWeight: '800', color: TEXT, margin: '0' } }, 'Step 3 — Stakeholder Input')
+      ),
+      sectionLabel('Collect responses from 6 key stakeholder groups'),
+      h('div', { style: {
+        display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+        gap: '16px'
+      } }, cards),
+      h('p', { style: { fontSize: '12px', color: TEXT3, marginTop: '16px' } },
+        'Total responses: ' + espState.stakeholderResponses.length
       )
     );
   }
 
+  // ── Step 4: County Mapping ───────────────────────────────────────────────
+  function renderStep4() {
+    return h('div', null,
+      h('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' } },
+        icon('map', { style: { fontSize: '28px', color: GOLD } }),
+        h('h2', { style: { fontSize: '1.35rem', fontWeight: '800', color: TEXT, margin: '0' } }, 'Step 4 — County Mapping')
+      ),
+      sectionLabel('Geospatial view of community resources & data layers'),
+      h('div', { style: Object.assign({}, cardStyle, {
+        textAlign: 'center', padding: '60px 28px',
+        background: 'linear-gradient(135deg, rgba(0,70,132,0.15), rgba(59,122,87,0.10))'
+      }) },
+        h('div', { style: { width: '80px', height: '80px', borderRadius: '50%', background: 'rgba(0,70,132,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px' } },
+          icon('explore', { style: { fontSize: '40px', color: BLUE } })
+        ),
+        h('h3', { style: { color: TEXT, fontSize: '1.1rem', fontWeight: '700', margin: '0 0 8px' } }, espState.county + ' County Interactive Map'),
+        h('p', { style: { color: TEXT2, fontSize: '14px', margin: '0 0 28px', maxWidth: '420px', marginLeft: 'auto', marginRight: 'auto', lineHeight: '1.6' } },
+          'View farm locations, food deserts, broadband coverage, soil types, and community resource distribution on the interactive county map.'
+        ),
+        h('button', {
+          style: Object.assign({}, btnGold, { padding: '14px 36px', fontSize: '15px' }),
+          onclick: function () {
+            markComplete(4);
+            if (window.setView) window.setView('map');
+          }
+        },
+          icon('open_in_new', { style: { fontSize: '18px', marginRight: '8px' } }),
+          'Open County Map →'
+        )
+      )
+    );
+  }
+
+  // ── Step 5: Citizen Data Collection ──────────────────────────────────────
   function renderStep5() {
-    const modes = [
-      { title: 'Electronic Survey', desc: 'Shareable link for online distribution', count: 142 },
-      { title: 'Digital In-Person', desc: 'Interviewer tablet collection', count: 38 },
-      { title: 'Physical', desc: 'Paper forms (requires manual data entry)', count: 12 }
+    var modes = [
+      {
+        title: 'Electronic',
+        icon: 'devices',
+        color: '#3b82f6',
+        desc: 'Online surveys via Qualtrics, Google Forms, or SurveyMonkey distributed through email, social media, and website embeds.',
+        stat: espState.citizenResponses.filter(function (r) { return r.mode === 'electronic'; }).length
+      },
+      {
+        title: 'Digital In‑Person',
+        icon: 'tablet_android',
+        color: '#8b5cf6',
+        desc: 'Tablet-based surveys at community events, farmers markets, and Extension office walk‑ins with real‑time data sync.',
+        stat: espState.citizenResponses.filter(function (r) { return r.mode === 'digital'; }).length
+      },
+      {
+        title: 'Physical',
+        icon: 'description',
+        color: '#f59e0b',
+        desc: 'Paper surveys with prepaid return envelopes for households without broadband access. Scanned and digitized for analysis.',
+        stat: espState.citizenResponses.filter(function (r) { return r.mode === 'physical'; }).length
+      }
     ];
 
-    const cards = h('div', { style: 'display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 20px;' },
-      ...modes.map(m => h('div', { style: cardStyle },
-        h('h3', { style: 'margin: 0 0 8px 0; font-size: 16px;' }, m.title),
-        h('p', { style: `color: ${theme.textMuted}; font-size: 13px; margin: 0 0 16px 0; min-height: 32px;` }, m.desc),
-        h('div', { style: 'display: flex; align-items: baseline; gap: 8px;' },
-          h('span', { style: 'font-size: 32px; font-weight: 700;' }, m.count),
-          h('span', { style: `color: ${theme.textMuted}; font-size: 13px;` }, 'records')
-        )
-      ))
-    );
-
-    const gapAnalysis = h('div', { style: `${cardStyle} margin-top: 24px; border-left: 4px solid ${theme.gold};` },
-      h('h3', { style: 'margin: 0 0 12px 0; font-size: 16px;' }, 'Demographic Gap Analysis'),
-      h('p', { style: `color: ${theme.textMuted}; font-style: italic; margin: 0;` }, 'Placeholder: Compare citizen response demographics against county census baselines to identify underrepresented populations.')
-    );
-
-    return h('div', {},
-      h('h2', { style: 'margin: 0 0 8px 0; font-size: 18px;' }, 'Citizen Data Collection'),
-      h('p', { style: `color: ${theme.textMuted}; margin: 0;` }, 'Track responses from broad citizen engagement efforts.'),
-      cards,
-      gapAnalysis
+    return h('div', null,
+      h('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' } },
+        icon('ballot', { style: { fontSize: '28px', color: GOLD } }),
+        h('h2', { style: { fontSize: '1.35rem', fontWeight: '800', color: TEXT, margin: '0' } }, 'Step 5 — Citizen Data Collection')
+      ),
+      sectionLabel('Three collection modes ensure inclusive participation'),
+      h('div', { style: {
+        display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
+        gap: '16px'
+      } },
+        modes.map(function (m) {
+          return h('div', {
+            style: Object.assign({}, cardStyle, { padding: '28px', transition: 'transform 0.2s, border-color 0.2s' }),
+            onmouseenter: function () { this.style.transform = 'translateY(-4px)'; this.style.borderColor = m.color; },
+            onmouseleave: function () { this.style.transform = 'none'; this.style.borderColor = BORDER; }
+          },
+            h('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' } },
+              h('div', { style: { width: '48px', height: '48px', borderRadius: '14px', background: m.color + '20', display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                icon(m.icon, { style: { fontSize: '24px', color: m.color } })
+              ),
+              h('span', { style: { fontSize: '28px', fontWeight: '800', color: m.color } }, String(m.stat))
+            ),
+            h('h3', { style: { color: TEXT, fontSize: '15px', fontWeight: '700', margin: '0 0 8px' } }, m.title),
+            h('p', { style: { color: TEXT3, fontSize: '13px', lineHeight: '1.6', margin: '0 0 16px' } }, m.desc),
+            h('button', {
+              style: Object.assign({}, btnOutline, { width: '100%', borderColor: m.color + '40', color: m.color }),
+              onclick: function () {
+                espState.citizenResponses.push({ mode: m.title.toLowerCase().replace(/[^a-z]/g, ''), date: new Date().toISOString() });
+                if (espState.citizenResponses.length >= 5) markComplete(5);
+                showToast('Response logged — ' + m.title);
+                window.render();
+              }
+            }, icon('add', { style: { fontSize: '16px', marginRight: '4px' } }), 'Log Response')
+          );
+        })
+      ),
+      h('p', { style: { fontSize: '12px', color: TEXT3, marginTop: '16px' } },
+        'Total citizen responses: ' + espState.citizenResponses.length
+      )
     );
   }
 
+  // ── Step 6: Triangulation ────────────────────────────────────────────────
   function renderStep6() {
-    const colStyle = `flex: 1; ${cardStyle}`;
-    const headerStyle = `font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: ${theme.textMuted}; margin: 0 0 16px 0; padding-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.1);`;
-    
-    const validatedBadge = h('div', { style: `margin-top: 12px; background: rgba(253, 185, 39, 0.15); border: 1px solid ${theme.gold}; color: ${theme.gold}; padding: 6px 12px; border-radius: 4px; font-size: 12px; font-weight: 600; display: inline-block;` }, '★ Validated Priority');
+    var sources = [
+      { title: 'Secondary Data', icon: 'database', color: '#3b82f6', items: ['Census / ACS', 'USDA NASS', 'County Health Rankings', 'BLS Employment'] },
+      { title: 'Stakeholder Input', icon: 'record_voice_over', color: '#8b5cf6', items: ['Elected Officials', 'Business Leaders', 'Educators', 'Health Providers'] },
+      { title: 'Citizen Surveys', icon: 'people', color: '#f59e0b', items: ['Electronic responses', 'In‑person digital', 'Paper surveys', 'Focus groups'] }
+    ];
 
-    const issueItem = (text, isValidated = false) => h('div', { style: 'background: rgba(0,0,0,0.3); padding: 12px; border-radius: 8px; margin-bottom: 12px;' },
-      h('div', { style: 'font-weight: 500;' }, text),
-      isValidated ? validatedBadge : null
-    );
-
-    return h('div', {},
-      h('h2', { style: 'margin: 0 0 8px 0; font-size: 18px;' }, 'Triangulation'),
-      h('p', { style: `color: ${theme.textMuted}; margin: 0 0 24px 0;` }, 'Issues appearing across multiple data sources become validated priorities.'),
-      h('div', { style: 'display: flex; gap: 16px;' },
-        h('div', { style: colStyle },
-          h('h3', { style: headerStyle }, 'Secondary Data Issues'),
-          issueItem('Aging Farm Operator Demographics', true),
-          issueItem('Food Desert Expansion in Rural Zones')
-        ),
-        h('div', { style: colStyle },
-          h('h3', { style: headerStyle }, 'Stakeholder Issues'),
-          issueItem('Youth Retention in Agriculture'),
-          issueItem('Aging Farm Operator Demographics', true)
-        ),
-        h('div', { style: colStyle },
-          h('h3', { style: headerStyle }, 'Citizen Issues'),
-          issueItem('Aging Farm Operator Demographics', true),
-          issueItem('Limited Access to High-Speed Internet')
-        )
+    return h('div', null,
+      h('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' } },
+        icon('hub', { style: { fontSize: '28px', color: GOLD } }),
+        h('h2', { style: { fontSize: '1.35rem', fontWeight: '800', color: TEXT, margin: '0' } }, 'Step 6 — Triangulation')
+      ),
+      sectionLabel('Cross-source issue validation — confirming patterns across all 3 data streams'),
+      h('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '16px' } },
+        sources.map(function (src) {
+          return h('div', { style: Object.assign({}, cardStyle, { padding: '24px' }) },
+            h('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' } },
+              h('div', { style: { width: '40px', height: '40px', borderRadius: '12px', background: src.color + '20', display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                icon(src.icon, { style: { fontSize: '22px', color: src.color } })
+              ),
+              h('h3', { style: { color: TEXT, fontSize: '14px', fontWeight: '700', margin: '0' } }, src.title)
+            ),
+            src.items.map(function (item) {
+              return h('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' } },
+                icon('check', { style: { fontSize: '14px', color: GREEN } }),
+                h('span', { style: { fontSize: '13px', color: TEXT2 } }, item)
+              );
+            })
+          );
+        })
+      ),
+      h('div', { style: { marginTop: '20px' } },
+        h('button', {
+          style: btnPrimary,
+          onclick: function () { markComplete(6); showToast('Triangulation matrix validated ✓'); window.render(); }
+        }, icon('verified', { style: { fontSize: '16px', marginRight: '6px' } }), 'Validate Triangulation')
       )
     );
   }
 
+  // ── Step 7: Asset Mapping ────────────────────────────────────────────────
   function renderStep7() {
-    return h('div', { style: cardStyle },
-      h('div', { style: 'display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;' },
-        h('h2', { style: 'margin: 0; font-size: 18px;' }, 'Community Asset Mapping'),
-        h('button', { style: btnPrimaryStyle }, '+ Add Asset')
+    var defaults = ['NC A&T CES Office', 'Guilford County Health Dept', 'United Way of Greater Greensboro', 'Triad Food Pantry Network', 'Piedmont Land Conservancy'];
+
+    if (espState.assets.length === 0) {
+      espState.assets = defaults.map(function (a) { return { name: a, added: true }; });
+    }
+
+    function addAsset() {
+      var input = document.getElementById('esp-asset-input');
+      if (input && input.value.trim()) {
+        espState.assets.push({ name: input.value.trim(), added: true });
+        markComplete(7);
+        showToast('Asset added: ' + input.value.trim());
+        window.render();
+      }
+    }
+
+    function removeAsset(idx) {
+      espState.assets.splice(idx, 1);
+      window.render();
+    }
+
+    return h('div', null,
+      h('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' } },
+        icon('location_city', { style: { fontSize: '28px', color: GOLD } }),
+        h('h2', { style: { fontSize: '1.35rem', fontWeight: '800', color: TEXT, margin: '0' } }, 'Step 7 — Community Asset Mapping')
       ),
-      h('input', { style: `${inputStyle} margin-bottom: 16px;`, placeholder: 'Search assets and partners...' }),
-      h('table', { style: 'width: 100%; border-collapse: collapse; text-align: left;' },
-        h('thead', {},
-          h('tr', { style: `border-bottom: 1px solid rgba(255,255,255,0.1); color: ${theme.textMuted};` },
-            h('th', { style: 'padding: 12px;' }, 'Name'),
-            h('th', { style: 'padding: 12px;' }, 'Type'),
-            h('th', { style: 'padding: 12px;' }, 'Contact'),
-            h('th', { style: 'padding: 12px;' }, 'Services'),
-            h('th', { style: 'padding: 12px; width: 50px;' }, '')
-          )
-        ),
-        h('tbody', {},
-          h('tr', { style: 'border-bottom: 1px solid rgba(255,255,255,0.05);' },
-            h('td', { style: 'padding: 12px; font-weight: 500;' }, 'Guilford County Soil & Water'),
-            h('td', { style: 'padding: 12px;' }, 'Government'),
-            h('td', { style: 'padding: 12px;' }, 'Jane Doe (jdoe@...)'),
-            h('td', { style: 'padding: 12px;' }, 'Conservation Planning, Grants'),
-            h('td', { style: 'padding: 12px; text-align: center;' }, h('button', { style: 'background: transparent; border: none; color: #ff4444; cursor: pointer;' }, '✕'))
-          )
+      sectionLabel('Searchable community asset inventory'),
+      // Add input
+      h('div', { style: { display: 'flex', gap: '10px', marginBottom: '20px' } },
+        h('input', {
+          id: 'esp-asset-input', type: 'text', placeholder: 'Add community asset…',
+          style: Object.assign({}, inputStyle, { flex: '1' }),
+          onfocus: function () { this.style.borderColor = GOLD; },
+          onblur: function () { this.style.borderColor = 'rgba(255,255,255,0.15)'; },
+          onkeydown: function (e) { if (e.key === 'Enter') addAsset(); }
+        }),
+        h('button', { style: btnPrimary, onclick: addAsset },
+          icon('add', { style: { fontSize: '18px' } })
         )
       ),
-      h('div', { style: `margin-top: 32px; padding: 16px; background: rgba(0,0,0,0.2); border-radius: 8px; border-left: 4px solid ${theme.primary};` },
-        h('h4', { style: 'margin: 0 0 8px 0;' }, 'Asset Gap Analysis'),
-        h('p', { style: `color: ${theme.textMuted}; margin: 0; font-size: 14px;` }, 'Review the resources needed to address your validated priorities. Identify missing partnerships required to execute your plan.')
-      )
+      // Asset list
+      h('div', { style: cardStyle },
+        espState.assets.map(function (asset, idx) {
+          return h('div', { style: {
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.04)'
+          } },
+            h('div', { style: { display: 'flex', alignItems: 'center', gap: '10px' } },
+              h('span', { style: { background: GREEN + '22', color: GREEN, borderRadius: '50%', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '800', flexShrink: '0' } }, String(idx + 1)),
+              h('span', { style: { color: TEXT, fontSize: '14px' } }, asset.name)
+            ),
+            h('button', {
+              style: { background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px' },
+              onclick: function () { removeAsset(idx); }
+            }, icon('close', { style: { fontSize: '18px', color: '#ef4444' } }))
+          );
+        })
+      ),
+      h('p', { style: { fontSize: '12px', color: TEXT3 } }, espState.assets.length + ' assets mapped')
     );
   }
 
+  // ── Step 8: Priority Dashboard ───────────────────────────────────────────
   function renderStep8() {
-    const listStyle = `background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); padding: 16px; border-radius: 8px; display: flex; align-items: center; gap: 16px; margin-bottom: 8px;`;
-    
-    return h('div', { style: cardStyle },
-      h('h2', { style: 'margin: 0 0 8px 0; font-size: 18px;' }, 'Priority Dashboard'),
-      h('p', { style: `color: ${theme.textMuted}; margin: 0 0 24px 0;` }, 'Rank the validated issues by severity and strategic alignment to form your top focus areas.'),
-      
-      h('div', { style: `${listStyle} border-left: 4px solid ${theme.gold};` },
-        h('div', { style: 'display: flex; flex-direction: column; gap: 4px; color: rgba(255,255,255,0.5); cursor: pointer;' },
-          h('span', {}, '▲'), h('span', {}, '▼')
-        ),
-        h('div', { style: 'flex: 1;' },
-          h('h4', { style: 'margin: 0 0 4px 0; font-size: 16px;' }, '1. Aging Farm Operator Demographics'),
-          h('div', { style: `color: ${theme.textMuted}; font-size: 12px;` }, 'Freq: High | Urgency: Critical')
-        ),
-        h('label', { style: 'display: flex; align-items: center; gap: 8px; cursor: pointer;' },
-          h('input', { type: 'checkbox', checked: true }),
-          'Strategic Alignment'
-        )
+    if (espState.priorities.length === 0 && espState.issues.length > 0) {
+      espState.priorities = espState.issues.map(function (iss, i) {
+        return { text: iss.text, category: iss.category, score: 5 - i, rank: i + 1 };
+      });
+    }
+
+    if (espState.priorities.length === 0) {
+      espState.priorities = [
+        { text: 'Broadband access for rural farms', category: 'Infrastructure', score: 5, rank: 1 },
+        { text: 'Youth ag-career pipeline', category: 'Youth & Families', score: 4, rank: 2 },
+        { text: 'Soil health education', category: 'Agriculture', score: 3, rank: 3 }
+      ];
+    }
+
+    function moveUp(idx) {
+      if (idx === 0) return;
+      var tmp = espState.priorities[idx];
+      espState.priorities[idx] = espState.priorities[idx - 1];
+      espState.priorities[idx - 1] = tmp;
+      espState.priorities.forEach(function (p, i) { p.rank = i + 1; });
+      window.render();
+    }
+
+    function moveDown(idx) {
+      if (idx >= espState.priorities.length - 1) return;
+      var tmp = espState.priorities[idx];
+      espState.priorities[idx] = espState.priorities[idx + 1];
+      espState.priorities[idx + 1] = tmp;
+      espState.priorities.forEach(function (p, i) { p.rank = i + 1; });
+      window.render();
+    }
+
+    function updateScore(idx, delta) {
+      espState.priorities[idx].score = Math.max(0, Math.min(10, espState.priorities[idx].score + delta));
+      window.render();
+    }
+
+    return h('div', null,
+      h('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' } },
+        icon('leaderboard', { style: { fontSize: '28px', color: GOLD } }),
+        h('h2', { style: { fontSize: '1.35rem', fontWeight: '800', color: TEXT, margin: '0' } }, 'Step 8 — Priority Ranking Dashboard')
       ),
-      h('div', { style: listStyle },
-        h('div', { style: 'display: flex; flex-direction: column; gap: 4px; color: rgba(255,255,255,0.5); cursor: pointer;' },
-          h('span', {}, '▲'), h('span', {}, '▼')
-        ),
-        h('div', { style: 'flex: 1;' },
-          h('h4', { style: 'margin: 0 0 4px 0; font-size: 16px;' }, '2. Broadband Infrastructure Gaps'),
-          h('div', { style: `color: ${theme.textMuted}; font-size: 12px;` }, 'Freq: Med | Urgency: High')
-        ),
-        h('label', { style: 'display: flex; align-items: center; gap: 8px; cursor: pointer;' },
-          h('input', { type: 'checkbox', checked: false }),
-          'Strategic Alignment'
-        )
-      )
+      sectionLabel('Drag, reorder, and score issues by community priority'),
+      h('div', { style: cardStyle },
+        espState.priorities.map(function (p, idx) {
+          var barWidth = (p.score / 10) * 100;
+          return h('div', { style: {
+            display: 'flex', alignItems: 'center', gap: '12px',
+            padding: '14px 0', borderBottom: '1px solid rgba(255,255,255,0.04)'
+          } },
+            // Rank
+            h('span', { style: { fontWeight: '800', fontSize: '18px', color: idx === 0 ? GOLD : TEXT3, width: '30px', textAlign: 'center', flexShrink: '0' } }, '#' + (idx + 1)),
+            // Content
+            h('div', { style: { flex: '1', minWidth: '0' } },
+              h('p', { style: { color: TEXT, fontSize: '14px', fontWeight: '600', margin: '0 0 6px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, p.text),
+              h('div', { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
+                h('div', { style: { flex: '1', height: '6px', borderRadius: '3px', background: 'rgba(255,255,255,0.08)', overflow: 'hidden' } },
+                  h('div', { style: { width: barWidth + '%', height: '100%', borderRadius: '3px', background: barWidth > 60 ? GREEN : barWidth > 30 ? GOLD : '#ef4444', transition: 'width 0.3s' } })
+                ),
+                h('span', { style: { fontSize: '12px', fontWeight: '800', color: GOLD, minWidth: '28px' } }, p.score + '/10')
+              )
+            ),
+            // Score controls
+            h('div', { style: { display: 'flex', gap: '4px', flexShrink: '0' } },
+              h('button', {
+                style: { background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '4px', cursor: 'pointer', display: 'flex' },
+                onclick: function () { updateScore(idx, -1); }, title: 'Score −1'
+              }, icon('remove', { style: { fontSize: '16px', color: '#ef4444' } })),
+              h('button', {
+                style: { background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '4px', cursor: 'pointer', display: 'flex' },
+                onclick: function () { updateScore(idx, 1); }, title: 'Score +1'
+              }, icon('add', { style: { fontSize: '16px', color: GREEN } }))
+            ),
+            // Arrows
+            h('div', { style: { display: 'flex', flexDirection: 'column', gap: '2px', flexShrink: '0' } },
+              h('button', {
+                style: { background: 'transparent', border: 'none', cursor: idx === 0 ? 'default' : 'pointer', padding: '2px', opacity: idx === 0 ? '0.25' : '1' },
+                onclick: function () { moveUp(idx); }, title: 'Move up'
+              }, icon('keyboard_arrow_up', { style: { fontSize: '20px', color: TEXT2 } })),
+              h('button', {
+                style: { background: 'transparent', border: 'none', cursor: idx >= espState.priorities.length - 1 ? 'default' : 'pointer', padding: '2px', opacity: idx >= espState.priorities.length - 1 ? '0.25' : '1' },
+                onclick: function () { moveDown(idx); }, title: 'Move down'
+              }, icon('keyboard_arrow_down', { style: { fontSize: '20px', color: TEXT2 } }))
+            )
+          );
+        })
+      ),
+      h('button', {
+        style: btnPrimary,
+        onclick: function () { markComplete(8); showToast('Priorities locked ✓'); window.render(); }
+      }, icon('lock', { style: { fontSize: '16px', marginRight: '6px' } }), 'Lock Priorities')
     );
   }
 
+  // ── Step 9: Executive Dashboard ──────────────────────────────────────────
   function renderStep9() {
-    const summaryCards = [
-      { label: 'Total Issues Identified', value: '24' },
-      { label: 'Validated Priorities', value: '5', highlight: theme.gold },
-      { label: 'Community Assets', value: '18' },
-      { label: 'Stakeholder Groups Engaged', value: '6' }
+    var stats = [
+      { label: 'Steps Complete',      value: espState.completedSteps.length + '/10', icon: 'task_alt',     color: GREEN },
+      { label: 'Issues Identified',   value: String(espState.issues.length),        icon: 'flag',          color: '#ef4444' },
+      { label: 'Stakeholder Inputs',  value: String(espState.stakeholderResponses.length), icon: 'groups', color: BLUE },
+      { label: 'Citizen Responses',   value: String(espState.citizenResponses.length), icon: 'people',     color: '#8b5cf6' },
+      { label: 'Community Assets',    value: String(espState.assets.length),         icon: 'location_city', color: '#f59e0b' },
+      { label: 'Priority Issues',     value: String(espState.priorities.length),     icon: 'leaderboard',   color: GOLD }
     ];
 
-    return h('div', {},
-      h('div', { style: 'display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;' },
-        h('h2', { style: 'margin: 0; font-size: 20px;' }, 'Executive Summary'),
-        h('button', { style: btnGoldStyle }, 'Generate Official Report PDF')
+    return h('div', null,
+      h('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' } },
+        icon('dashboard', { style: { fontSize: '28px', color: GOLD } }),
+        h('h2', { style: { fontSize: '1.35rem', fontWeight: '800', color: TEXT, margin: '0' } }, 'Step 9 — Executive Summary Dashboard')
       ),
-      h('div', { style: 'display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px;' },
-        ...summaryCards.map(s => h('div', { style: cardStyle },
-          h('div', { style: `color: ${s.highlight || theme.textLight}; font-size: 36px; font-weight: 700; margin-bottom: 8px;` }, s.value),
-          h('div', { style: `color: ${theme.textMuted}; font-size: 14px; font-weight: 500;` }, s.label)
-        ))
+      sectionLabel(espState.county + ' County Environmental Scan — Summary Metrics'),
+      h('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: '14px', marginBottom: '24px' } },
+        stats.map(function (s) {
+          return h('div', {
+            style: Object.assign({}, cardStyle, {
+              textAlign: 'center', padding: '24px 16px',
+              transition: 'transform 0.2s, border-color 0.2s'
+            }),
+            onmouseenter: function () { this.style.transform = 'translateY(-3px)'; this.style.borderColor = s.color; },
+            onmouseleave: function () { this.style.transform = 'none'; this.style.borderColor = BORDER; }
+          },
+            h('div', { style: { width: '44px', height: '44px', borderRadius: '50%', background: s.color + '20', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' } },
+              icon(s.icon, { style: { fontSize: '22px', color: s.color } })
+            ),
+            h('p', { style: { fontSize: '28px', fontWeight: '800', color: TEXT, margin: '0 0 4px' } }, s.value),
+            h('p', { style: { fontSize: '12px', color: TEXT3, fontWeight: '600', margin: '0' } }, s.label)
+          );
+        })
       ),
-      h('div', { style: `${cardStyle} min-height: 300px; display: flex; align-items: center; justify-content: center;` },
-        h('span', { style: `color: ${theme.textMuted}; font-style: italic;` }, '[ Chart Visualization Area ]')
+      // Top priorities summary
+      espState.priorities.length > 0
+        ? h('div', { style: Object.assign({}, cardStyle, { marginBottom: '20px' }) },
+            sectionLabel('Top Priorities'),
+            espState.priorities.slice(0, 3).map(function (p, i) {
+              return h('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' } },
+                h('span', { style: { background: i === 0 ? GOLD : GREEN, color: i === 0 ? '#0a0e17' : '#fff', borderRadius: '50%', width: '26px', height: '26px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '800', flexShrink: '0' } }, String(i + 1)),
+                h('span', { style: { color: TEXT, fontSize: '14px', flex: '1' } }, p.text),
+                h('span', { style: { fontSize: '13px', fontWeight: '800', color: GOLD } }, p.score + '/10')
+              );
+            })
+          )
+        : null,
+      h('div', { style: { display: 'flex', gap: '12px', flexWrap: 'wrap' } },
+        h('button', {
+          style: btnGold,
+          onclick: function () { markComplete(9); showToast('Executive report generated — downloading PDF…'); window.render(); }
+        }, icon('picture_as_pdf', { style: { fontSize: '16px', marginRight: '6px' } }), 'Generate Report'),
+        h('button', {
+          style: btnOutline,
+          onclick: function () { showToast('Dashboard shared via email'); }
+        }, icon('share', { style: { fontSize: '16px', marginRight: '6px' } }), 'Share Dashboard')
       )
     );
   }
 
+  // ── Step 10: Database & ERP ──────────────────────────────────────────────
   function renderStep10() {
-    const checks = [
-      'Process documented internally',
-      'Process improvements identified',
-      'Priorities routed to CES system',
-      'Ag tech priorities routed to SFRIC (Small Farm Research & Innovation Center)',
-      'ABCD (Asset-Based Community Development) plan created'
+    var checks = [
+      { key: 'data_backup',    label: 'All survey data backed up to cloud' },
+      { key: 'report_filed',   label: 'County Report filed with State Office' },
+      { key: 'erp_synced',     label: 'ERP system synced with NIFA reporting' },
+      { key: 'stakeholder_ack', label: 'Stakeholder acknowledgment letters sent' },
+      { key: 'budget_aligned', label: 'Budget aligned to priority areas' },
+      { key: 'timeline_set',   label: 'Implementation timeline established' },
+      { key: 'staff_assigned', label: 'Staff/agent assignments documented' },
+      { key: 'eval_metrics',   label: 'Evaluation metrics and KPIs defined' },
+      { key: 'public_release', label: 'Public-facing summary released' },
+      { key: 'next_cycle',     label: 'Next scanning cycle date set' }
     ];
 
-    return h('div', { style: cardStyle },
-      h('h2', { style: 'margin: 0 0 8px 0; font-size: 18px;' }, 'Database & ERP Handoff'),
-      h('p', { style: `color: ${theme.textMuted}; margin: 0 0 24px 0;` }, 'Ensure the environmental scanning process is properly closed out and outputs are fed into operational systems.'),
-      
-      h('div', { style: 'display: flex; flex-direction: column; gap: 16px;' },
-        ...checks.map(c => h('label', { style: `display: flex; align-items: center; gap: 12px; padding: 16px; background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; cursor: pointer; transition: 0.2s;` },
-          h('input', { type: 'checkbox', style: 'width: 18px; height: 18px; cursor: pointer; accent-color: #3B7A57;' }),
-          h('span', { style: 'font-weight: 500; font-size: 15px;' }, c)
-        ))
+    var allChecked = checks.every(function (c) { return espState.auditChecks[c.key]; });
+
+    return h('div', null,
+      h('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' } },
+        icon('storage', { style: { fontSize: '28px', color: GOLD } }),
+        h('h2', { style: { fontSize: '1.35rem', fontWeight: '800', color: TEXT, margin: '0' } }, 'Step 10 — Database & ERP Audit')
       ),
-      h('div', { style: 'margin-top: 32px; display: flex; justify-content: flex-end;' },
-        h('button', { style: `${btnPrimaryStyle} background: ${theme.blue}; padding: 12px 32px; font-size: 16px;`, onclick: () => showToast('Process Finalized!') }, 'Finalize Process & Sync to ERP')
+      sectionLabel('Final checklist — complete all items to close the scanning cycle'),
+      h('div', { style: cardStyle },
+        checks.map(function (c) {
+          var isChecked = !!espState.auditChecks[c.key];
+          return h('label', {
+            style: {
+              display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 0',
+              borderBottom: '1px solid rgba(255,255,255,0.04)', cursor: 'pointer',
+              transition: 'background 0.15s'
+            },
+            onmouseenter: function () { this.style.background = 'rgba(255,255,255,0.03)'; },
+            onmouseleave: function () { this.style.background = 'transparent'; }
+          },
+            // Custom checkbox
+            h('div', {
+              style: {
+                width: '22px', height: '22px', borderRadius: '6px', flexShrink: '0',
+                border: isChecked ? 'none' : '2px solid rgba(255,255,255,0.2)',
+                background: isChecked ? GREEN : 'transparent',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                transition: 'all 0.2s', cursor: 'pointer'
+              },
+              onclick: function (e) {
+                e.preventDefault();
+                espState.auditChecks[c.key] = !espState.auditChecks[c.key];
+                var nowAll = checks.every(function (ch) { return espState.auditChecks[ch.key]; });
+                if (nowAll) markComplete(10);
+                window.render();
+              }
+            },
+              isChecked ? icon('check', { style: { fontSize: '16px', color: '#fff' } }) : null
+            ),
+            h('span', { style: { color: isChecked ? TEXT : TEXT2, fontSize: '14px', fontWeight: isChecked ? '600' : '400', textDecoration: isChecked ? 'line-through' : 'none', transition: 'all 0.2s' } }, c.label)
+          );
+        })
+      ),
+      h('div', { style: { display: 'flex', alignItems: 'center', gap: '12px', marginTop: '16px' } },
+        h('span', { style: { fontSize: '13px', color: TEXT3 } },
+          Object.keys(espState.auditChecks).filter(function (k) { return espState.auditChecks[k]; }).length + '/' + checks.length + ' items complete'
+        ),
+        allChecked
+          ? h('span', { style: { fontSize: '13px', fontWeight: '700', color: GREEN, display: 'flex', alignItems: 'center', gap: '4px' } },
+              icon('verified', { style: { fontSize: '16px', color: GREEN } }), 'Audit Complete'
+            )
+          : null
       )
     );
   }
 
-  // Initial render
-  render();
-  
-  return container;
+  // ══════════════════════════════════════════════════════════════════════════
+  //  STEP CONTENT ROUTER
+  // ══════════════════════════════════════════════════════════════════════════
+  var stepRenderers = {
+    1: renderStep1, 2: renderStep2, 3: renderStep3, 4: renderStep4,
+    5: renderStep5, 6: renderStep6, 7: renderStep7, 8: renderStep8,
+    9: renderStep9, 10: renderStep10
+  };
+
+  var currentStepContent = (stepRenderers[espState.currentStep] || renderStep1)();
+
+  // ── Step footer nav ──────────────────────────────────────────────────────
+  var stepFooter = h('div', { style: {
+    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+    marginTop: '32px', paddingTop: '24px',
+    borderTop: '1px solid rgba(255,255,255,0.06)'
+  } },
+    espState.currentStep > 1
+      ? h('button', {
+          style: Object.assign({}, btnOutline, { display: 'flex', alignItems: 'center', gap: '6px' }),
+          onclick: function () { goStep(espState.currentStep - 1); }
+        }, icon('arrow_back', { style: { fontSize: '18px' } }), 'Step ' + (espState.currentStep - 1))
+      : h('span'),
+    h('span', { style: { fontSize: '13px', color: TEXT3, fontWeight: '600' } },
+      'Step ' + espState.currentStep + ' of 10'
+    ),
+    espState.currentStep < 10
+      ? h('button', {
+          style: Object.assign({}, btnPrimary, { display: 'flex', alignItems: 'center', gap: '6px' }),
+          onclick: function () { goStep(espState.currentStep + 1); }
+        }, 'Step ' + (espState.currentStep + 1), icon('arrow_forward', { style: { fontSize: '18px' } }))
+      : h('button', {
+          style: Object.assign({}, btnGold, { display: 'flex', alignItems: 'center', gap: '6px' }),
+          onclick: function () { showToast('Environmental Scan cycle complete! 🎉'); }
+        }, icon('celebration', { style: { fontSize: '18px' } }), 'Complete Scan')
+  );
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  ASSEMBLE & RETURN
+  // ══════════════════════════════════════════════════════════════════════════
+  return h('div', {
+    className: 'esp-dashboard',
+    style: {
+      padding: '2rem', maxWidth: '1100px', margin: '0 auto',
+      fontFamily: FONT, color: TEXT, minHeight: '100vh'
+    }
+  },
+    // Outer glass panel
+    h('div', { style: {
+      background: GLASS, backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
+      border: '1px solid ' + GLASS_BORDER, borderRadius: '20px',
+      padding: '36px', boxShadow: '0 16px 64px rgba(0,0,0,0.6)'
+    } },
+      header,
+      stepNav,
+      currentStepContent,
+      stepFooter
+    )
+  );
 };
