@@ -143,6 +143,90 @@
     );
 
     appNode.appendChild(wrapper);
+
+    // ── Login / Role Selection Modal ──
+    if (st.showLogin) {
+      var roles = [
+        { id: 'community', icon: 'groups', label: 'Community Explorer', desc: 'View farm map, resources, and learn about Bona Fide Farm eligibility.', color: '#3B7A57', mode: 'community' },
+        { id: 'agent', icon: 'support_agent', label: 'Extension Agent', desc: 'NC A&T / Cooperative Extension staff. Manage farm assessments and ESP reports.', color: '#004684', mode: 'admin' },
+        { id: 'admin', icon: 'admin_panel_settings', label: 'Administrator', desc: 'Planning officials and research leads. Full platform access and data export.', color: '#7B1FA2', mode: 'admin' }
+      ];
+
+      var overlay = h('div', {
+        id: 'login-modal-overlay',
+        style: { position: 'fixed', inset: '0', zIndex: '9999', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)' },
+        onclick: function(e) { if (e.target.id === 'login-modal-overlay') { st.showLogin = false; render(); } }
+      },
+        h('div', { style: { width: '420px', maxWidth: '92vw', background: 'rgba(15,23,42,0.97)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '20px', padding: '32px', boxShadow: '0 24px 80px rgba(0,0,0,0.5)', fontFamily: 'Inter, sans-serif' } },
+
+          // Header
+          h('div', { style: { textAlign: 'center', marginBottom: '24px' } },
+            h('div', { style: { fontSize: '28px', fontWeight: '900', color: '#f8fafc', marginBottom: '4px' } }, 'ncsmall.farm'),
+            h('div', { style: { fontSize: '12px', color: '#94a3b8' } }, 'Select your role to continue')
+          ),
+
+          // Role cards
+          h('div', { style: { display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '20px' } },
+            roles.map(function(r) {
+              return h('button', {
+                key: r.id,
+                style: {
+                  display: 'flex', alignItems: 'center', gap: '14px', width: '100%',
+                  padding: '14px 16px', borderRadius: '12px',
+                  background: 'rgba(255,255,255,0.04)',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  cursor: 'pointer', textAlign: 'left', fontFamily: 'Inter, sans-serif',
+                  transition: 'all 0.2s'
+                },
+                onmouseenter: function() { this.style.background = r.color + '22'; this.style.borderColor = r.color + '44'; },
+                onmouseleave: function() { this.style.background = 'rgba(255,255,255,0.04)'; this.style.borderColor = 'rgba(255,255,255,0.08)'; },
+                onclick: function() {
+                  st.user = { displayName: r.label, role: r.id, email: r.id + '@ncsmall.farm' };
+                  st.mode = r.mode;
+                  st.showLogin = false;
+                  window.render();
+                }
+              },
+                h('div', { style: { width: '44px', height: '44px', borderRadius: '12px', background: r.color + '22', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: '0' } },
+                  h('span', { className: 'material-icons-round', style: { fontSize: '22px', color: r.color } }, r.icon)
+                ),
+                h('div', { style: { flex: '1' } },
+                  h('div', { style: { fontSize: '13px', fontWeight: '700', color: '#f8fafc', marginBottom: '2px' } }, r.label),
+                  h('div', { style: { fontSize: '10px', color: '#94a3b8', lineHeight: '1.3' } }, r.desc)
+                ),
+                h('span', { className: 'material-icons-round', style: { fontSize: '18px', color: '#475569' } }, 'arrow_forward')
+              );
+            })
+          ),
+
+          // Divider
+          h('div', { style: { display: 'flex', alignItems: 'center', gap: '12px', margin: '16px 0' } },
+            h('div', { style: { flex: '1', height: '1px', background: 'rgba(255,255,255,0.08)' } }),
+            h('span', { style: { fontSize: '10px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' } }, 'Coming Soon'),
+            h('div', { style: { flex: '1', height: '1px', background: 'rgba(255,255,255,0.08)' } })
+          ),
+
+          // Future auth options (disabled)
+          h('div', { style: { display: 'flex', gap: '8px' } },
+            h('button', { style: { flex: '1', padding: '10px', borderRadius: '8px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', color: '#475569', fontSize: '11px', fontWeight: '600', cursor: 'not-allowed', fontFamily: 'Inter, sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }, disabled: true },
+              h('img', { src: 'https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg', style: { width: '14px', height: '14px', opacity: '0.4' } }),
+              'Google SSO'
+            ),
+            h('button', { style: { flex: '1', padding: '10px', borderRadius: '8px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', color: '#475569', fontSize: '11px', fontWeight: '600', cursor: 'not-allowed', fontFamily: 'Inter, sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }, disabled: true },
+              h('span', { className: 'material-icons-round', style: { fontSize: '14px', opacity: '0.4' } }, 'email'),
+              'Email Login'
+            )
+          ),
+
+          // Footer
+          h('div', { style: { textAlign: 'center', marginTop: '16px', fontSize: '9px', color: '#475569' } },
+            'NC A&T State University · Cooperative Extension · Think! Design & Planning'
+          )
+        )
+      );
+
+      appNode.appendChild(overlay);
+    }
   };
 
   // --- Initialization ---
