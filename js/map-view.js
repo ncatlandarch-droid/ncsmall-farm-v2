@@ -340,7 +340,9 @@
     'Future Land Use':       { service: 'futurelu',   color: '#F57F17', fillOpacity: 0.22, weight: 1 },
     'Water Bodies & Streams':{ service: 'hydrology',  color: '#1E88E5', fillOpacity: 0.35, weight: 2 },
     'Flood Zones':           { service: 'floodplain', color: '#2196F3', fillOpacity: 0.25, weight: 1.5 },
-    'Wetlands (NWI)':        { service: 'wetlands',   color: '#00897B', fillOpacity: 0.30, weight: 1 }
+    'Wetlands (NWI)':        { service: 'wetlands',   color: '#00897B', fillOpacity: 0.30, weight: 1 },
+    'Building Footprints':   { service: 'buildings',  color: '#FF6B35', fillOpacity: 0.35, weight: 1.5 },
+    'Elevation (DEM)':       { service: 'contours',   color: '#66BB6A', fillOpacity: 0,    weight: 1.5 }
   };
 
   function toggleLayer(name, show) {
@@ -469,6 +471,14 @@
       case 'Wetlands (NWI)':
         html += '<b style="color:#00897B;">' + (p.WETLAND_TYPE || p.ATTRIBUTE || p.attribute || 'Wetland') + '</b>';
         if (p.ACRES || p.Shape_Area) html += '<br>' + parseFloat(p.ACRES || (p.Shape_Area * 0.000247105)).toFixed(1) + ' ac';
+        break;
+      case 'Building Footprints':
+        html += '<b style="color:#FF6B35;">' + (p.name || p.building || 'Building') + '</b>';
+        if (p.addr) html += '<br>' + p.addr;
+        break;
+      case 'Elevation (DEM)':
+        html += '<b style="color:#66BB6A;">Contour ' + (p.CONTOURELE || p.contourele || p.ELEV || '') + ' ft</b>';
+        if (p.CONTOURTAG || p.contourtag) html += '<br>' + (p.CONTOURTAG || p.contourtag);
         break;
       default:
         html += '<b>' + JSON.stringify(p).substring(0, 100) + '</b>';

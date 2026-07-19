@@ -48,6 +48,7 @@ export default async (request) => {
       case 'overlay':    return await fetchOverlayDistricts(west, south, east, north);
       case 'historic':   return await fetchHistoricDistricts(west, south, east, north);
       case 'futurelu':   return await fetchFutureLandUse(west, south, east, north);
+      case 'buildings':  return await fetchBuildings(west, south, east, north);
       default:           return json({ error: `Unknown service: ${service}` }, 400);
     }
   } catch (err) {
@@ -739,6 +740,49 @@ function geojsonResp(data) {
     status: 200,
     headers: { 'Content-Type': 'application/geo+json', ...CORS }
   });
+}
+
+// ---------------------------------------------------------------------------
+// Buildings — OpenStreetMap Overpass API (same as AVA V.4)
+// ---------------------------------------------------------------------------
+async function fetchBuildings(w, s, e, n) {
+  const query = `[out:json][timeout:15];way["building"](${s},${w},${n},${e});out body;>;out skel qt;`;
+  const res = await fetch('https://overpass-api.de/api/interpreter', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: 'data=' + encodeURIComponent(query)
+  });
+  if (!res.ok) throw new Error('Overpass API error: ' + res.status);
+  const data = await res.json();
+  
+  // Build node lookup
+  const nodes = {};
+  for (const el of data.elements) {
+    if (el.type === 'node') nodes[el.id] = [el.lon, el.lat];
+  }
+  
+  // Convert ways to GeoJSON polygons
+  const features = [];
+  for (const el of data.elements) {
+    if (el.type !== 'way' || !el.nodes) continue;
+    const coords = el.nodes.map(id => nodes[id]).filter(Boolean);
+    if (coords.length < 3) continue;
+    // Close the polygon if not already closed
+    if (coords[0][0] !== coords[coords.length-1][0] || coords[0][1] !== coords[coords.length-1][1]) {
+      coords.push(coords[0]);
+    }
+    features.push({
+      type: 'Feature',
+      properties: {
+        building: el.tags?.building || 'yes',
+        name: el.tags?.name || '',
+        addr: el.tags?.['addr:housenumber'] ? (el.tags['addr:housenumber'] + ' ' + (el.tags['addr:street'] || '')) : ''
+      },
+      geometry: { type: 'Polygon', coordinates: [coords] }
+    });
+  }
+  
+  return json({ type: 'FeatureCollection', features });
 }
 
 function json(obj, status = 200) {
