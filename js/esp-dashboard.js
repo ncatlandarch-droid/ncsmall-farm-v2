@@ -541,20 +541,32 @@ window.renderESPDashboard = function () {
     );
   }
 
-  // ── Step 7: Asset Mapping ────────────────────────────────────────────────
+  // ── Step 7: Asset Mapping (ABCD-Informed) ──────────────────────────────
   function renderStep7() {
-    var defaults = ['NC A&T CES Office', 'Guilford County Health Dept', 'United Way of Greater Greensboro', 'Triad Food Pantry Network', 'Piedmont Land Conservancy'];
+    // ABCD categories with icons, colors, and seed examples
+    var categories = [
+      { key: 'individual',   label: 'Individual Gifts & Skills', icon: 'person',          color: '#4CAF50', examples: ['Master Gardener — J. Williams', 'Soil Conservation Expert — R. Davis'] },
+      { key: 'association',  label: 'Local Associations',        icon: 'groups',           color: '#29B6F6', examples: ['Guilford County Farm Bureau', 'Piedmont Triad Farmers Market Co-op'] },
+      { key: 'institution',  label: 'Institutions',              icon: 'account_balance',  color: '#AB47BC', examples: ['NC A&T CES Office', 'Guilford County Health Dept', 'NRCS Greensboro'] },
+      { key: 'physical',     label: 'Physical Assets',           icon: 'home_work',        color: '#FF7043', examples: ['Community Garden — E. Market St', 'Extension Meeting Hall'] },
+      { key: 'economic',     label: 'Economic Assets',           icon: 'payments',         color: '#FDB927', examples: ['Piedmont Land Conservancy', 'United Way of Greater Greensboro'] }
+    ];
 
+    // Initialize assets by category if empty
     if (espState.assets.length === 0) {
-      espState.assets = defaults.map(function (a) { return { name: a, added: true }; });
+      categories.forEach(function(cat) {
+        cat.examples.forEach(function(ex) {
+          espState.assets.push({ name: ex, category: cat.key, added: true });
+        });
+      });
     }
 
-    function addAsset() {
-      var input = document.getElementById('esp-asset-input');
+    function addAsset(catKey) {
+      var input = document.getElementById('esp-asset-' + catKey);
       if (input && input.value.trim()) {
-        espState.assets.push({ name: input.value.trim(), added: true });
+        espState.assets.push({ name: input.value.trim(), category: catKey, added: true });
         markComplete(7);
-        showToast('Asset added: ' + input.value.trim());
+        showToast('Asset added');
         window.render();
       }
     }
@@ -564,44 +576,91 @@ window.renderESPDashboard = function () {
       window.render();
     }
 
+    // Count assets per category
+    var catCounts = {};
+    categories.forEach(function(cat) { catCounts[cat.key] = 0; });
+    espState.assets.forEach(function(a) { if (catCounts[a.category] !== undefined) catCounts[a.category]++; });
+    var filledCats = Object.values(catCounts).filter(function(c) { return c > 0; }).length;
+
+    // Build category cards
+    var categoryCards = categories.map(function(cat) {
+      var catAssets = espState.assets.filter(function(a) { return a.category === cat.key; });
+      
+      return h('div', { style: Object.assign({}, cardStyle, { marginBottom: '16px' }) },
+        h('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' } },
+          h('div', { style: { display: 'flex', alignItems: 'center', gap: '10px' } },
+            h('span', { style: { background: cat.color + '22', color: cat.color, borderRadius: '8px', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+              icon(cat.icon, { style: { fontSize: '18px' } })
+            ),
+            h('div', null,
+              h('div', { style: { fontSize: '13px', fontWeight: '700', color: TEXT } }, cat.label),
+              h('div', { style: { fontSize: '10px', color: TEXT3 } }, catAssets.length + ' mapped')
+            )
+          ),
+          h('span', { style: { background: cat.color + '33', color: cat.color, padding: '2px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: '800' } }, String(catAssets.length))
+        ),
+        catAssets.length > 0 ? h('div', { style: { marginBottom: '10px' } },
+          catAssets.map(function(asset) {
+            var globalIdx = espState.assets.indexOf(asset);
+            return h('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.03)' } },
+              h('span', { style: { color: TEXT2, fontSize: '12px' } }, asset.name),
+              h('button', {
+                style: { background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', opacity: '0.5' },
+                onclick: function() { removeAsset(globalIdx); }
+              }, icon('close', { style: { fontSize: '14px', color: '#ef4444' } }))
+            );
+          })
+        ) : h('div', { style: { fontSize: '11px', color: TEXT3, fontStyle: 'italic', padding: '6px 0' } }, 'No assets mapped yet'),
+        h('div', { style: { display: 'flex', gap: '8px' } },
+          h('input', {
+            id: 'esp-asset-' + cat.key, type: 'text',
+            placeholder: 'Add ' + cat.label.toLowerCase() + '...',
+            style: Object.assign({}, inputStyle, { flex: '1', fontSize: '11px', padding: '6px 10px' }),
+            onfocus: function() { this.style.borderColor = cat.color; },
+            onblur: function() { this.style.borderColor = 'rgba(255,255,255,0.15)'; },
+            onkeydown: function(e) { if (e.key === 'Enter') addAsset(cat.key); }
+          }),
+          h('button', {
+            style: Object.assign({}, btnPrimary, { padding: '6px 10px', fontSize: '11px' }),
+            onclick: function() { addAsset(cat.key); }
+          }, icon('add', { style: { fontSize: '16px' } }))
+        )
+      );
+    });
+
     return h('div', null,
-      h('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' } },
+      h('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' } },
         icon('location_city', { style: { fontSize: '28px', color: GOLD } }),
         h('h2', { style: { fontSize: '1.35rem', fontWeight: '800', color: TEXT, margin: '0' } }, 'Step 7 — Community Asset Mapping')
       ),
-      sectionLabel('Searchable community asset inventory'),
-      // Add input
-      h('div', { style: { display: 'flex', gap: '10px', marginBottom: '20px' } },
-        h('input', {
-          id: 'esp-asset-input', type: 'text', placeholder: 'Add community asset…',
-          style: Object.assign({}, inputStyle, { flex: '1' }),
-          onfocus: function () { this.style.borderColor = GOLD; },
-          onblur: function () { this.style.borderColor = 'rgba(255,255,255,0.15)'; },
-          onkeydown: function (e) { if (e.key === 'Enter') addAsset(); }
-        }),
-        h('button', { style: btnPrimary, onclick: addAsset },
-          icon('add', { style: { fontSize: '18px' } })
-        )
+      sectionLabel('Map what your community already has — organized by type'),
+      h('div', { style: Object.assign({}, cardStyle, { marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '12px' }) },
+        icon('check_circle', { style: { fontSize: '20px', color: filledCats === 5 ? GREEN : GOLD } }),
+        h('div', { style: { flex: '1' } },
+          h('div', { style: { fontSize: '12px', fontWeight: '700', color: TEXT, marginBottom: '4px' } }, 'Asset Coverage: ' + filledCats + ' of 5 categories'),
+          h('div', { style: { height: '4px', background: 'rgba(255,255,255,0.08)', borderRadius: '2px', overflow: 'hidden' } },
+            h('div', { style: { height: '100%', width: (filledCats * 20) + '%', background: filledCats === 5 ? GREEN : GOLD, borderRadius: '2px', transition: 'width 0.3s' } })
+          )
+        ),
+        h('span', { style: { fontSize: '11px', color: TEXT3 } }, espState.assets.length + ' total')
       ),
-      // Asset list
-      h('div', { style: cardStyle },
-        espState.assets.map(function (asset, idx) {
-          return h('div', { style: {
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.04)'
-          } },
-            h('div', { style: { display: 'flex', alignItems: 'center', gap: '10px' } },
-              h('span', { style: { background: GREEN + '22', color: GREEN, borderRadius: '50%', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '800', flexShrink: '0' } }, String(idx + 1)),
-              h('span', { style: { color: TEXT, fontSize: '14px' } }, asset.name)
-            ),
-            h('button', {
-              style: { background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px' },
-              onclick: function () { removeAsset(idx); }
-            }, icon('close', { style: { fontSize: '18px', color: '#ef4444' } }))
-          );
-        })
-      ),
-      h('p', { style: { fontSize: '12px', color: TEXT3 } }, espState.assets.length + ' assets mapped')
+      h('div', null, categoryCards),
+      h('div', { style: Object.assign({}, cardStyle, { borderLeft: '3px solid ' + (filledCats < 5 ? '#ef4444' : GREEN) }) },
+        h('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' } },
+          icon(filledCats < 5 ? 'warning' : 'verified', { style: { fontSize: '18px', color: filledCats < 5 ? '#ef4444' : GREEN } }),
+          h('div', { style: { fontSize: '13px', fontWeight: '700', color: TEXT } }, 'Gap Analysis')
+        ),
+        filledCats < 5 ?
+          h('div', null,
+            h('div', { style: { fontSize: '11px', color: TEXT2, marginBottom: '6px' } }, 'Categories with no assets mapped:'),
+            h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '6px' } },
+              categories.filter(function(cat) { return catCounts[cat.key] === 0; }).map(function(cat) {
+                return h('span', { style: { background: '#ef444422', color: '#ef4444', padding: '3px 10px', borderRadius: '12px', fontSize: '10px', fontWeight: '700' } }, cat.label);
+              })
+            )
+          ) :
+          h('div', { style: { fontSize: '11px', color: GREEN, fontWeight: '600' } }, 'All 5 asset categories covered — excellent!')
+      )
     );
   }
 
