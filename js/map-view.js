@@ -140,9 +140,9 @@
     if (lu.indexOf('FARM') >= 0 || lu.indexOf('AGRI') >= 0 || lu.indexOf('CROP') >= 0 ||
         lu.indexOf('TIMBER') >= 0 || lu.indexOf('FOREST') >= 0) score += 2;
 
-    if (score >= 6) return { level: 'likely', label: 'Likely Eligible', color: '#2E7D32', icon: 'verified', classes: classes };
-    if (score >= 3 && classes.length > 0) return { level: 'potential', label: 'Potentially Eligible', color: '#E65100', icon: 'help_outline', classes: classes };
-    if (ac >= 5) return { level: 'review', label: 'May Qualify — Review Needed', color: '#1565C0', icon: 'info', classes: classes };
+    if (score >= 6) return { level: 'likely', label: 'Meets All Criteria', color: '#2E7D32', icon: 'verified', classes: classes };
+    if (score >= 3 && classes.length > 0) return { level: 'potential', label: 'Meets Acreage Threshold', color: '#E65100', icon: 'help_outline', classes: classes };
+    if (ac >= 5) return { level: 'review', label: 'Meets Acreage Threshold', color: '#1565C0', icon: 'info', classes: classes };
     return { level: 'ineligible', label: 'Below Acreage Threshold', color: '#78909C', icon: 'block', classes: [] };
   }
 
@@ -1014,12 +1014,13 @@
             + '<span class="material-icons-round" style="font-size:15px;">' + bffQuick.icon + '</span> Bona Fide Farm Eligibility</div>'
             + '<span style="padding:2px 7px; border-radius:4px; font-size:10px; font-weight:700; background:' + bffQuick.color + '22; color:' + bffQuick.color + '; border:1px solid ' + bffQuick.color + '44;">' + bffQuick.label + '</span>';
           if (bffQuick.classes.length > 0) {
-            popupContent += '<div style="font-size:9px; color:#cbd5e1; margin-top:5px;">Qualifies as: ' + bffQuick.classes.join(', ') + '</div>';
+            popupContent += '<div style="font-size:9px; color:#cbd5e1; margin-top:5px;">Acreage qualifies as: ' + bffQuick.classes.join(', ') + '</div>';
           }
-          popupContent += '<div style="font-size:8px; color:#94a3b8; margin-top:3px;">Per NCGS §153A-340 · Exempt from zoning & some building codes</div>'
+          popupContent += '<div style="font-size:8px; color:#FDB927; margin-top:4px; font-weight:600; line-height:1.3;">To qualify: must demonstrate active commercial production and $1,000+/yr gross income from agricultural products.</div>'
+            + '<div style="font-size:8px; color:#94a3b8; margin-top:2px;">Per NCGS §153A-340 · Zoning does not affect eligibility</div>'
             + '<a href="https://www.guilfordcountync.gov/our-county/departments-services-p-z/planning-development" target="_blank" '
             + 'style="display:block; text-align:center; padding:6px; margin-top:6px; background:' + bffQuick.color + '; color:white; border-radius:5px; font-size:10px; font-weight:700; text-decoration:none;">'
-            + '📋 Apply for Bona Fide Farm Status</a></div>';
+            + '📋 Learn How to Apply</a></div>';
         }
 
         popupContent += '<div id="tax-data-' + pin + '" style="margin-bottom:12px; padding: 8px; background: rgba(255,255,255,0.06); border-radius: 6px;">'
