@@ -83,14 +83,30 @@
         className: 'glass rounded-2xl p-8 flex flex-col items-center border-t-4 border-aggie-blue shadow-xl',
         style: {
           position: 'relative',
-          backgroundImage: 'linear-gradient(to bottom, rgba(255,255,255,0.88), rgba(255,255,255,0.92)), url("https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=1200&q=80")',
-          backgroundSize: 'cover',
-          backgroundPosition: 'center'
+          overflow: 'hidden'
         }
       },
+        // Ken Burns hero background
+        h('div', {
+          style: {
+            position: 'absolute', top: '0', left: '0', right: '0', bottom: '0',
+            backgroundImage: 'url("images/nc-farm-hero.png")',
+            backgroundSize: 'cover', backgroundPosition: 'center',
+            animation: 'kenBurns 25s ease-in-out infinite alternate',
+            zIndex: '0'
+          }
+        }),
+        // Dark gradient overlay for readability
+        h('div', {
+          style: {
+            position: 'absolute', top: '0', left: '0', right: '0', bottom: '0',
+            background: 'linear-gradient(180deg, rgba(0,46,84,0.72) 0%, rgba(0,46,84,0.82) 40%, rgba(0,46,84,0.92) 100%)',
+            zIndex: '1'
+          }
+        }),
         h('div', {
           className: 'relative flex-shrink-0 mb-4',
-          style: { width: '280px', height: '280px', cursor: 'pointer' },
+          style: { width: '280px', height: '280px', cursor: 'pointer', position: 'relative', zIndex: '2' },
           title: st.speakingAvatarId === 'kenji' ? 'Stop speaking' : 'Click to hear Aggie',
           onClick: () => toggleAvatarVoice(kenji)
         },
@@ -100,17 +116,17 @@
             style: { position: 'absolute', bottom: '8px', right: '8px', width: '36px', height: '36px', borderRadius: '50%', background: st.speakingAvatarId === 'kenji' ? 'var(--aggie-gold)' : 'rgba(0,70,132,0.15)', color: st.speakingAvatarId === 'kenji' ? '#fff' : 'var(--aggie-blue)', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #fff', boxShadow: '0 2px 6px rgba(0,0,0,0.15)' }
           }, st.speakingAvatarId === 'kenji' ? h('span', { className: 'material-icons-round' }, 'stop') : (st.voiceOn ? h('span', { className: 'material-icons-round' }, 'volume_up') : h('span', { className: 'material-icons-round' }, 'volume_off')))
         ),
-        h('h1', { style: { fontSize: '2.75rem', fontWeight: '900', color: 'var(--aggie-blue)', letterSpacing: '-0.03em', textAlign: 'center' } }, 'NCSmall.Farm'),
-        h('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '24px', margin: '0.5rem 0 0.75rem', flexWrap: 'wrap' } },
-          h('img', { src: 'images/sfric-logo-horizontal.png', alt: 'SFRIC — Small Farm Research & Innovation Center', style: { height: '94px' } }),
-          h('img', { src: 'images/nc-coop-ext-doublestack.jpg', alt: 'NC Cooperative Extension', style: { height: '78px', opacity: 0.85 } })
+        h('h1', { style: { fontSize: '2.75rem', fontWeight: '900', color: '#fff', letterSpacing: '-0.03em', textAlign: 'center', position: 'relative', zIndex: '2', textShadow: '0 2px 8px rgba(0,0,0,0.3)' } }, 'NCSmall.Farm'),
+        h('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '24px', margin: '0.5rem 0 0.75rem', flexWrap: 'wrap', position: 'relative', zIndex: '2' } },
+          h('img', { src: 'images/sfric-logo-horizontal.png', alt: 'SFRIC — Small Farm Research & Innovation Center', style: { height: '94px', filter: 'brightness(1.1)' } }),
+          h('img', { src: 'images/nc-coop-ext-doublestack.jpg', alt: 'NC Cooperative Extension', style: { height: '78px', filter: 'brightness(1.2)' } })
         ),
-        h('p', { style: { fontSize: '1.1rem', lineHeight: '1.7', color: 'var(--text-secondary)', maxWidth: '520px', textAlign: 'center', margin: '0 auto 1rem' } },
+        h('p', { style: { fontSize: '1.1rem', lineHeight: '1.7', color: 'rgba(255,255,255,0.85)', maxWidth: '520px', textAlign: 'center', margin: '0 auto 1rem', position: 'relative', zIndex: '2' } },
           'How can we help you today? Ask me anything about agriculture, nutrition, community resources, or upcoming events.'
         ),
         
         // Combined smart input — address OR question
-        h('div', { style: { width: '100%', maxWidth: '560px', display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(255,255,255,0.7)', borderRadius: '14px', padding: '6px 6px 6px 12px', border: '1px solid var(--border-light)', boxShadow: '0 2px 12px rgba(0,0,0,0.06)' } },
+        h('div', { style: { width: '100%', maxWidth: '560px', display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(255,255,255,0.9)', borderRadius: '14px', padding: '6px 6px 6px 12px', border: '1px solid rgba(255,255,255,0.3)', boxShadow: '0 4px 20px rgba(0,0,0,0.2)', position: 'relative', zIndex: '2' } },
           h('span', { className: 'material-icons-round', style: { color: 'var(--text-muted)', fontSize: '22px' } }, 'agriculture'),
           h('input', {
             type: 'text',
