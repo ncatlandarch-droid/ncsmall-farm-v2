@@ -64,22 +64,40 @@
         code.includes('RURAL') || code.includes('AG');
     if (isAgZoned) return 'likely-farm';
 
-    // ── Likely: large parcels (10+ acres) in any residential/vacant class ─
+    // ── EXCLUSION: land uses that are NEVER farms ─────────────
+    // Must check BEFORE acreage rules to prevent false positives
+    var isDefinitelyNotFarm =
+        lu.includes('INSTIT') || lu.includes('COLLEGE') || lu.includes('SCHOOL') ||
+        lu.includes('UNIVER') || lu.includes('CHURCH') || lu.includes('WORSHIP') ||
+        lu.includes('HOSPITAL') || lu.includes('MEDICAL') || lu.includes('CLINIC') ||
+        lu.includes('COMMER') || lu.includes('RETAIL') || lu.includes('OFFICE') ||
+        lu.includes('SHOP') || lu.includes('STORE') || lu.includes('MALL') ||
+        lu.includes('INDUST') || lu.includes('MANUFAC') || lu.includes('WAREHOUSE') ||
+        lu.includes('APART') || lu.includes('MULTI') || lu.includes('CONDO') ||
+        lu.includes('TOWNHO') || lu.includes('DUPLEX') || lu.includes('TRIPLEX') ||
+        lu.includes('GOVERN') || lu.includes('PUBLIC') || lu.includes('MUNICI') ||
+        lu.includes('CITY') || lu.includes('COUNTY') || lu.includes('STATE') ||
+        lu.includes('FEDERAL') || lu.includes('CEMETERY') || lu.includes('PARK') ||
+        lu.includes('GOLF') || lu.includes('RECREATION') || lu.includes('UTILITY') ||
+        lu.includes('HOTEL') || lu.includes('MOTEL') || lu.includes('LODGE') ||
+        lu.includes('PARKING') || lu.includes('EASEMENT') || lu.includes('RIGHT') ||
+        lu.includes('MINING') || lu.includes('QUARRY') ||
+        // NC numeric use codes: 300-399=Commercial, 400-499=Industrial, 800-899=Institutional
+        (numCode >= 300 && numCode < 600) || (numCode >= 800);
+    if (isDefinitelyNotFarm) return 'non-agricultural';
+
+    // ── Likely: large parcels (10+ acres) in residential/vacant ─
     // In rural NC, 10+ acres of residential is almost always agricultural
     if (ac >= 10 && (lu.includes('RESID') || lu.includes('VACANT') || lu.includes('SINGLE') ||
-        lu.includes('EXEMPT') || lu.includes('OPEN') || lu.includes('UNDEV') ||
+        lu.includes('OPEN') || lu.includes('UNDEV') ||
         lu === '' || lu === 'UNKNOWN')) {
       return 'likely-farm';
     }
 
-    // ── Potential: 5-10 acre parcels that could be horticultural ─
-    if (ac >= 5) {
-      return 'potential-farm';
-    }
-
-    // ── Potential: 2+ acres with farm-suggestive use codes ─
-    if (ac >= 2 && (lu.includes('RURAL') || lu.includes('VACANT') || lu.includes('OPEN') ||
-        lu.includes('UNDEV') || numCode >= 100 && numCode < 200)) {
+    // ── Potential: 5+ acre parcels with residential/vacant use ─
+    if (ac >= 5 && (lu.includes('RESID') || lu.includes('VACANT') || lu.includes('SINGLE') ||
+        lu.includes('OPEN') || lu.includes('UNDEV') || lu.includes('EXEMPT') ||
+        lu === '' || lu === 'UNKNOWN')) {
       return 'potential-farm';
     }
 
