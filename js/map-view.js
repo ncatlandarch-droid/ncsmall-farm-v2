@@ -67,6 +67,48 @@
     return 'non-agricultural';
   }
 
+  /* ── Bona Fide Farm Eligibility Classifier (NCGS 153A-340) ── */
+  function bonaFideEligibility(acres, landUse, zoning, miscImprovements, deferredValue) {
+    var ac = parseFloat(acres) || 0;
+    var lu = (landUse || '').toUpperCase();
+    var zn = (zoning || '').toUpperCase();
+    var misc = (miscImprovements || '').toUpperCase();
+    var hasDeferral = deferredValue && Number(deferredValue) > 0;
+
+    // Farm structures = strong indicator
+    var hasFarmStructure = misc.indexOf('BARN') >= 0 || misc.indexOf('SILO') >= 0 ||
+      misc.indexOf('GREENHOUSE') >= 0 || misc.indexOf('STABLE') >= 0 ||
+      misc.indexOf('POULTRY') >= 0 || misc.indexOf('GRAIN') >= 0 ||
+      misc.indexOf('DAIRY') >= 0 || misc.indexOf('EQUIP') >= 0;
+
+    // Ag zoning
+    var isAgZoned = zn.indexOf('AG') >= 0 || zn.indexOf('R-A') >= 0 ||
+      zn.indexOf('RURAL') >= 0 || lu.indexOf('AGRI') >= 0 ||
+      lu.indexOf('FARM') >= 0 || lu.indexOf('CROP') >= 0;
+
+    // ── Classification thresholds per NCGS ──
+    var classes = [];
+    if (ac >= 10) classes.push('Agricultural (10+ ac)');
+    if (ac >= 5)  classes.push('Horticultural (5+ ac)');
+    if (ac >= 20) classes.push('Forest (20+ ac)');
+
+    // Score: higher = more likely eligible
+    var score = 0;
+    if (classes.length > 0) score += 2;
+    if (isAgZoned)          score += 2;
+    if (hasFarmStructure)   score += 2;
+    if (hasDeferral)        score += 3;
+
+    // Additional: if already classified as farm by our classifier
+    if (lu.indexOf('FARM') >= 0 || lu.indexOf('AGRI') >= 0 || lu.indexOf('CROP') >= 0 ||
+        lu.indexOf('TIMBER') >= 0 || lu.indexOf('FOREST') >= 0) score += 2;
+
+    if (score >= 6) return { level: 'likely', label: 'Likely Eligible', color: '#2E7D32', icon: 'verified', classes: classes };
+    if (score >= 3 && classes.length > 0) return { level: 'potential', label: 'Potentially Eligible', color: '#E65100', icon: 'help_outline', classes: classes };
+    if (ac >= 5) return { level: 'review', label: 'May Qualify — Review Needed', color: '#1565C0', icon: 'info', classes: classes };
+    return { level: 'ineligible', label: 'Below Acreage Threshold', color: '#78909C', icon: 'block', classes: [] };
+  }
+
   /* ── Main Render ─────────────────────────────────────────── */
   window.renderMapView = function() {
     setTimeout(() => initMap(), 80);
@@ -1026,6 +1068,32 @@
                 html += `<div style="font-size:12px; font-weight:800; color:#FDB927;">Est. Potential: $${Math.round(minTotal).toLocaleString()} - $${Math.round(maxTotal).toLocaleString()}</div>`;
                 html += '<div style="font-size:9px; color:#94a3b8; margin-top:6px;">* Historically Underserved producers may qualify for higher rates.</div>';
                 html += '</div>';
+            }
+
+            // ── Bona Fide Farm Eligibility Card (NCGS 153A-340) ──
+            var bffZoning = data.zoning || data.zoningCode || '';
+            var bffMisc = data.miscImprovements || data.buildingType || data.propertyType || '';
+            var bff = bonaFideEligibility(acres, landUse, bffZoning, bffMisc, data.deferredValue);
+
+            if (bff.level !== 'ineligible') {
+              html += '<div style="margin-top: 12px; padding: 12px; background: ' + bff.color + '15; border-left: 4px solid ' + bff.color + '; border-radius: 4px;">';
+              html += '<div style="font-size:12px; font-weight:800; color:' + bff.color + '; margin-bottom:4px; display:flex; align-items:center; gap:4px;">'
+                + '<span class="material-icons-round" style="font-size:16px;">' + bff.icon + '</span> Bona Fide Farm Status</div>';
+              html += '<div style="display:flex; align-items:center; gap:6px; margin-bottom:6px;">'
+                + '<span style="padding:2px 8px; border-radius:4px; font-size:10px; font-weight:700; background:' + bff.color + '22; color:' + bff.color + '; border:1px solid ' + bff.color + '44;">' + bff.label + '</span></div>';
+
+              if (bff.classes.length > 0) {
+                html += '<div style="font-size:10px; color:#cbd5e1; margin-bottom:6px;">Qualifying under NCGS 153A-340:</div>';
+                html += '<ul style="margin:0; padding-left:16px; font-size:10px; color:#f8fafc; margin-bottom:8px;">';
+                bff.classes.forEach(function(c) { html += '<li>' + c + '</li>'; });
+                html += '</ul>';
+              }
+
+              html += '<div style="font-size:9px; color:#94a3b8; margin-bottom:8px; line-height:1.4;">Bona Fide Farms are exempt from zoning regulations and some NC Building Code requirements.</div>';
+              html += '<a href="https://www.guilfordcountync.gov/our-county/departments-services-p-z/planning-development" target="_blank" '
+                + 'style="display:block; text-align:center; padding:8px; background:' + bff.color + '; color:white; border-radius:6px; font-size:11px; font-weight:700; text-decoration:none; font-family:Inter,sans-serif;">'
+                + '📋 Apply for Bona Fide Farm Status</a>';
+              html += '</div>';
             }
 
             container.innerHTML = html;
