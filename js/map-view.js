@@ -466,23 +466,23 @@
             var fillColor = config.color;
             var p = feature.properties || {};
 
-            // Soils: color by drainage class
+            // Soils: color by drainage class — brown/earth tones
             if (name === 'Soils (SSURGO)' && p.drclassdcd) {
               var dc = (p.drclassdcd || '').toLowerCase();
-              if (dc.indexOf('excessively') >= 0)          fillColor = '#E8D44D'; // yellow — drains fast
-              else if (dc.indexOf('well') >= 0 && dc.indexOf('poor') < 0 && dc.indexOf('moderate') < 0) fillColor = '#43A047'; // green — ideal
-              else if (dc.indexOf('moderately well') >= 0) fillColor = '#66BB6A'; // light green
-              else if (dc.indexOf('somewhat poorly') >= 0) fillColor = '#4FC3F7'; // light blue
-              else if (dc.indexOf('poorly') >= 0 && dc.indexOf('very') < 0) fillColor = '#0288D1'; // blue
-              else if (dc.indexOf('very poorly') >= 0)     fillColor = '#7B1FA2'; // purple — wetland
+              if (dc.indexOf('excessively') >= 0)          fillColor = '#D7CCC8'; // pale sand — drains too fast
+              else if (dc.indexOf('well') >= 0 && dc.indexOf('poor') < 0 && dc.indexOf('moderate') < 0) fillColor = '#A1887F'; // warm brown — ideal
+              else if (dc.indexOf('moderately well') >= 0) fillColor = '#BCAAA4'; // light brown
+              else if (dc.indexOf('somewhat poorly') >= 0) fillColor = '#8D6E63'; // medium brown
+              else if (dc.indexOf('poorly') >= 0 && dc.indexOf('very') < 0) fillColor = '#6D4C41'; // dark brown
+              else if (dc.indexOf('very poorly') >= 0)     fillColor = '#4E342E'; // deep umber — wetland
               else fillColor = '#90A4AE'; // gray — unknown
             } else if (name === 'Soils (SSURGO)' && p.hydgrpdcd) {
               // Fallback: color by hydrologic group
               var hg = (p.hydgrpdcd || '').toUpperCase();
-              if (hg === 'A')      fillColor = '#43A047'; // well drained
-              else if (hg === 'B') fillColor = '#66BB6A';
-              else if (hg === 'C') fillColor = '#FFA726'; // moderate runoff
-              else if (hg === 'D') fillColor = '#0288D1'; // high runoff
+              if (hg === 'A')      fillColor = '#D7CCC8'; // sandy, fast drain
+              else if (hg === 'B') fillColor = '#A1887F'; // moderate
+              else if (hg === 'C') fillColor = '#8D6E63'; // slow drain
+              else if (hg === 'D') fillColor = '#4E342E'; // clay, very slow
               else                 fillColor = '#90A4AE';
             }
 
